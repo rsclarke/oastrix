@@ -13,6 +13,7 @@ import (
 	"github.com/rsclarke/oastrix/internal/auth"
 	"github.com/rsclarke/oastrix/internal/db"
 	"github.com/rsclarke/oastrix/internal/token"
+	"go.uber.org/zap"
 )
 
 type contextKey string
@@ -30,6 +31,7 @@ type APIServer struct {
 	DB     *sql.DB
 	Domain string
 	Pepper []byte
+	Logger *zap.Logger
 }
 
 func (s *APIServer) AuthMiddleware(next http.Handler) http.Handler {

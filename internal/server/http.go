@@ -5,17 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"strings"
 
 	"github.com/rsclarke/oastrix/internal/db"
+	"github.com/rsclarke/oastrix/internal/logging"
+	"go.uber.org/zap"
 )
 
 type HTTPServer struct {
 	DB     *sql.DB
 	Domain string
+	Logger *zap.Logger
 }
 
 func ExtractToken(r *http.Request, domain string) string {
@@ -58,13 +60,13 @@ func (s *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	tok, err := db.GetTokenByValue(s.DB, token)
 	if err != nil {
-		log.Printf("error looking up token %s: %v", token, err)
+		s.Logger.Error("lookup token failed", logging.Token(token), zap.Error(err))
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 		return
 	}
 	if tok == nil {
-		log.Printf("unknown token: %s", token)
+		s.Logger.Debug("unknown token", logging.Token(token))
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 		return
@@ -89,7 +91,7 @@ func (s *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	interactionID, err := db.CreateInteraction(s.DB, tok.ID, "http", remoteIP, remotePort, tls, summary)
 	if err != nil {
-		log.Printf("error creating interaction: %v", err)
+		s.Logger.Error("create interaction failed", zap.Error(err))
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 		return
@@ -103,13 +105,13 @@ func (s *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("error reading body: %v", err)
+		s.Logger.Warn("read body failed", zap.Error(err))
 		body = nil
 	}
 
 	err = db.CreateHTTPInteraction(s.DB, interactionID, r.Method, scheme, r.Host, r.URL.Path, r.URL.RawQuery, r.Proto, string(headersJSON), body)
 	if err != nil {
-		log.Printf("error creating http interaction: %v", err)
+		s.Logger.Error("create http interaction failed", zap.Error(err))
 	}
 
 	w.WriteHeader(http.StatusOK)

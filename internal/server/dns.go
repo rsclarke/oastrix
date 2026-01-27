@@ -3,7 +3,6 @@ package server
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"time"
@@ -11,6 +10,8 @@ import (
 	"github.com/miekg/dns"
 	"github.com/rsclarke/oastrix/internal/acme"
 	"github.com/rsclarke/oastrix/internal/db"
+	"github.com/rsclarke/oastrix/internal/logging"
+	"go.uber.org/zap"
 )
 
 type DNSServer struct {
@@ -18,6 +19,7 @@ type DNSServer struct {
 	Domain    string
 	PublicIP  string // IP address to return for ns1.<domain> and A queries
 	TXTStore  *acme.TXTStore
+	Logger    *zap.Logger
 	udpServer *dns.Server
 	tcpServer *dns.Server
 }
@@ -41,12 +43,12 @@ func (s *DNSServer) Start(udpPort, tcpPort int) error {
 	tcpReady := make(chan error, 1)
 
 	go func() {
-		log.Printf("Starting DNS server (UDP) on :%d", udpPort)
+		s.Logger.Info("starting dns server", logging.Net("udp"), logging.Port(udpPort))
 		udpReady <- s.udpServer.ListenAndServe()
 	}()
 
 	go func() {
-		log.Printf("Starting DNS server (TCP) on :%d", tcpPort)
+		s.Logger.Info("starting dns server", logging.Net("tcp"), logging.Port(tcpPort))
 		tcpReady <- s.tcpServer.ListenAndServe()
 	}()
 
@@ -154,12 +156,12 @@ func (s *DNSServer) handleDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 		tok, err := db.GetTokenByValue(s.DB, token)
 		if err != nil {
-			log.Printf("error looking up token %s: %v", token, err)
+			s.Logger.Error("lookup token failed", logging.Token(token), zap.Error(err))
 			m.Rcode = dns.RcodeNameError
 			continue
 		}
 		if tok == nil {
-			log.Printf("unknown token from DNS: %s", token)
+			s.Logger.Debug("unknown token", logging.Token(token), logging.QName(qname))
 			m.Rcode = dns.RcodeNameError
 			continue
 		}
@@ -173,13 +175,13 @@ func (s *DNSServer) handleDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 		interactionID, err := db.CreateInteraction(s.DB, tok.ID, "dns", remoteIP, remotePort, false, summary)
 		if err != nil {
-			log.Printf("error creating DNS interaction: %v", err)
+			s.Logger.Error("create dns interaction failed", zap.Error(err))
 			continue
 		}
 
 		err = db.CreateDNSInteraction(s.DB, interactionID, qname, int(q.Qtype), int(q.Qclass), rd, int(r.Opcode), int(r.Id), protocol)
 		if err != nil {
-			log.Printf("error creating DNS interaction details: %v", err)
+			s.Logger.Error("create dns interaction details failed", zap.Error(err))
 		}
 
 		switch q.Qtype {

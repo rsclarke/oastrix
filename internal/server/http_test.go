@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/rsclarke/oastrix/internal/db"
+	"go.uber.org/zap"
 )
 
 func TestExtractToken_FromHost(t *testing.T) {
@@ -120,6 +121,7 @@ func TestHTTPServer_StoresInteraction(t *testing.T) {
 	srv := &HTTPServer{
 		DB:     database,
 		Domain: "oastrix.example.com",
+		Logger: zap.NewNop(),
 	}
 
 	req := httptest.NewRequest("POST", "http://testtoken123.oastrix.example.com/test/path?foo=bar", strings.NewReader("request body"))
@@ -177,6 +179,7 @@ func TestHTTPServer_UnknownTokenDoesNotError(t *testing.T) {
 	srv := &HTTPServer{
 		DB:     database,
 		Domain: "oastrix.example.com",
+		Logger: zap.NewNop(),
 	}
 
 	req := httptest.NewRequest("GET", "http://unknowntoken.oastrix.example.com/", nil)

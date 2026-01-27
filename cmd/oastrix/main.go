@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,7 +17,10 @@ import (
 	"github.com/rsclarke/oastrix/internal/client"
 	"github.com/rsclarke/oastrix/internal/config"
 	"github.com/rsclarke/oastrix/internal/db"
+	"github.com/rsclarke/oastrix/internal/logging"
 	"github.com/rsclarke/oastrix/internal/server"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func main() {
@@ -27,9 +29,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	logger, err := logging.New(logging.FromEnv())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error initializing logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer logging.Sync(logger)
+
 	switch os.Args[1] {
 	case "server":
-		if err := runServer(os.Args[2:]); err != nil {
+		if err := runServer(os.Args[2:], logger); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
@@ -62,7 +71,7 @@ func main() {
 	}
 }
 
-func runServer(args []string) error {
+func runServer(args []string, logger *zap.Logger) error {
 	serverCmd := flag.NewFlagSet("server", flag.ExitOnError)
 
 	var httpPort int
@@ -151,17 +160,20 @@ func runServer(args []string) error {
 	httpSrv := &server.HTTPServer{
 		DB:     database,
 		Domain: domain,
+		Logger: logger.Named("http"),
 	}
 
+	httpErrLog, _ := zap.NewStdLogAt(logger.Named("http"), zapcore.ErrorLevel)
 	httpServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", httpPort),
-		Handler: httpSrv,
+		Addr:     fmt.Sprintf(":%d", httpPort),
+		Handler:  httpSrv,
+		ErrorLog: httpErrLog,
 	}
 
 	go func() {
-		log.Printf("Starting HTTP server on :%d", httpPort)
+		logger.Info("starting http server", logging.Port(httpPort))
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("HTTP server error: %v", err)
+			logger.Error("http server error", zap.Error(err))
 		}
 	}()
 
@@ -169,17 +181,20 @@ func runServer(args []string) error {
 		DB:     database,
 		Domain: domain,
 		Pepper: pepperBytes,
+		Logger: logger.Named("api"),
 	}
 
+	apiErrLog, _ := zap.NewStdLogAt(logger.Named("api"), zapcore.ErrorLevel)
 	apiServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", apiPort),
-		Handler: apiSrv.Handler(),
+		Addr:     fmt.Sprintf(":%d", apiPort),
+		Handler:  apiSrv.Handler(),
+		ErrorLog: apiErrLog,
 	}
 
 	go func() {
-		log.Printf("Starting API server on :%d", apiPort)
+		logger.Info("starting api server", logging.Port(apiPort))
 		if err := apiServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("API server error: %v", err)
+			logger.Error("api server error", zap.Error(err))
 		}
 	}()
 
@@ -188,34 +203,37 @@ func runServer(args []string) error {
 		Domain:   domain,
 		PublicIP: publicIP,
 		TXTStore: txtStore,
+		Logger:   logger.Named("dns"),
 	}
 	if err := dnsSrv.Start(dnsPort, dnsPort); err != nil {
 		return fmt.Errorf("start DNS server: %w", err)
 	}
 
 	var httpsServer *http.Server
+	httpsErrLog, _ := zap.NewStdLogAt(logger.Named("https"), zapcore.ErrorLevel)
 	if acmeMode {
 		// ACME mode: obtain certificates via Let's Encrypt DNS-01 challenge
 		storageDir := filepath.Join(filepath.Dir(dbPath), "certmagic")
-		manager := acme.NewManager(domain, acmeEmail, storageDir, acmeStaging, txtStore)
+		manager := acme.NewManager(domain, acmeEmail, storageDir, acmeStaging, txtStore, logger.Named("certmagic"))
 
-		log.Printf("Starting ACME certificate acquisition for %s (staging=%v)", domain, acmeStaging)
+		logger.Info("starting acme certificate acquisition", logging.Domain(domain), zap.Bool("staging", acmeStaging))
 		ctx := context.Background()
 		if err := manager.Manage(ctx); err != nil {
 			return fmt.Errorf("ACME certificate acquisition: %w", err)
 		}
-		log.Printf("ACME certificate obtained successfully")
+		logger.Info("acme certificate obtained", logging.Domain(domain))
 
 		httpsServer = &http.Server{
 			Addr:      fmt.Sprintf(":%d", httpsPort),
 			Handler:   httpSrv,
 			TLSConfig: manager.TLSConfig(),
+			ErrorLog:  httpsErrLog,
 		}
 
 		go func() {
-			log.Printf("Starting HTTPS server on :%d (ACME)", httpsPort)
+			logger.Info("starting https server", logging.Port(httpsPort), logging.TLSMode("acme"))
 			if err := httpsServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-				log.Printf("HTTPS server error: %v", err)
+				logger.Error("https server error", zap.Error(err))
 			}
 		}()
 	} else if manualTLS {
@@ -233,24 +251,25 @@ func runServer(args []string) error {
 			Addr:      fmt.Sprintf(":%d", httpsPort),
 			Handler:   httpSrv,
 			TLSConfig: tlsConfig,
+			ErrorLog:  httpsErrLog,
 		}
 
 		go func() {
-			log.Printf("Starting HTTPS server on :%d (manual TLS)", httpsPort)
+			logger.Info("starting https server", logging.Port(httpsPort), logging.TLSMode("manual"))
 			if err := httpsServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-				log.Printf("HTTPS server error: %v", err)
+				logger.Error("https server error", zap.Error(err))
 			}
 		}()
 	} else {
 		// No HTTPS mode: --no-acme without manual certs
-		log.Printf("HTTPS disabled (--no-acme specified without manual TLS certificates)")
+		logger.Info("https disabled", zap.String("reason", "no-acme specified without manual TLS certificates"))
 	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
 
-	log.Println("Shutting down...")
+	logger.Info("shutting down")
 
 	ctx := context.Background()
 	if httpsServer != nil {

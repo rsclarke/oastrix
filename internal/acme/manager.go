@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/caddyserver/certmagic"
+	"go.uber.org/zap"
 )
 
 // Manager handles automatic certificate acquisition and renewal via ACME
@@ -16,18 +17,23 @@ type Manager struct {
 	Staging    bool
 	StorageDir string
 	TXTStore   *TXTStore
+	Logger     *zap.Logger
 
 	config *certmagic.Config
 }
 
 // NewManager creates a new ACME manager
-func NewManager(domain, email, storageDir string, staging bool, store *TXTStore) *Manager {
+func NewManager(domain, email, storageDir string, staging bool, store *TXTStore, logger *zap.Logger) *Manager {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	return &Manager{
 		Domain:     domain,
 		Email:      email,
 		Staging:    staging,
 		StorageDir: storageDir,
 		TXTStore:   store,
+		Logger:     logger,
 	}
 }
 
@@ -37,9 +43,15 @@ func (m *Manager) Manage(ctx context.Context) error {
 	// Create file storage for certificates
 	storage := &certmagic.FileStorage{Path: m.StorageDir}
 
+	// Set the global default logger BEFORE calling NewDefault() so that
+	// internal certmagic components (cache maintainer, ACME client, etc.)
+	// inherit our zap logger when the cache is created
+	certmagic.Default.Logger = m.Logger
+
 	// Create the config
 	m.config = certmagic.NewDefault()
 	m.config.Storage = storage
+	m.config.Logger = m.Logger
 
 	// Configure the ACME issuer
 	var caURL string
@@ -56,9 +68,11 @@ func (m *Manager) Manage(ctx context.Context) error {
 		CA:     caURL,
 		Email:  m.Email,
 		Agreed: true,
+		Logger: m.Logger,
 		DNS01Solver: &certmagic.DNS01Solver{
 			DNSManager: certmagic.DNSManager{
 				DNSProvider: dnsProvider,
+				Logger:      m.Logger,
 			},
 		},
 	})
