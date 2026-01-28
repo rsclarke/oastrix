@@ -6,6 +6,7 @@ import (
 
 	"github.com/miekg/dns"
 	"github.com/rsclarke/oastrix/internal/acme"
+	"go.uber.org/zap"
 )
 
 type mockResponseWriter struct {
@@ -49,6 +50,7 @@ func TestDNSServer_TXTQuery(t *testing.T) {
 	s := &DNSServer{
 		Domain:   "example.com",
 		TXTStore: store,
+		Logger:   zap.NewNop(),
 	}
 
 	req := new(dns.Msg)
@@ -86,6 +88,7 @@ func TestDNSServer_TXTQueryMultipleValues(t *testing.T) {
 	s := &DNSServer{
 		Domain:   "example.com",
 		TXTStore: store,
+		Logger:   zap.NewNop(),
 	}
 
 	req := new(dns.Msg)
@@ -127,6 +130,7 @@ func TestDNSServer_TXTQueryNoValue(t *testing.T) {
 	s := &DNSServer{
 		Domain:   "example.com",
 		TXTStore: store,
+		Logger:   zap.NewNop(),
 	}
 
 	req := new(dns.Msg)
@@ -151,6 +155,7 @@ func TestDNSServer_TXTQueryNoStore(t *testing.T) {
 	s := &DNSServer{
 		Domain:   "example.com",
 		TXTStore: nil,
+		Logger:   zap.NewNop(),
 	}
 
 	req := new(dns.Msg)
