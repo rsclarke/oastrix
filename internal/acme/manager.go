@@ -3,45 +3,54 @@ package acme
 import (
 	"context"
 	"crypto/tls"
+	"database/sql"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/caddyserver/certmagic"
+	certmagicsqlite "github.com/rsclarke/certmagic-sqlite"
 	"go.uber.org/zap"
 )
 
 // Manager handles automatic certificate acquisition and renewal via ACME
 type Manager struct {
-	Domain     string
-	Email      string
-	Staging    bool
-	StorageDir string
-	TXTStore   *TXTStore
-	Logger     *zap.Logger
+	Domain   string
+	Email    string
+	Staging  bool
+	DB       *sql.DB
+	TXTStore *TXTStore
+	Logger   *zap.Logger
 
-	config *certmagic.Config
+	config  *certmagic.Config
+	storage *certmagicsqlite.SQLiteStorage
 }
 
 // NewManager creates a new ACME manager
-func NewManager(domain, email, storageDir string, staging bool, store *TXTStore, logger *zap.Logger) *Manager {
+func NewManager(domain, email string, db *sql.DB, staging bool, store *TXTStore, logger *zap.Logger) *Manager {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 	return &Manager{
-		Domain:     domain,
-		Email:      email,
-		Staging:    staging,
-		StorageDir: storageDir,
-		TXTStore:   store,
-		Logger:     logger,
+		Domain:   domain,
+		Email:    email,
+		Staging:  staging,
+		DB:       db,
+		TXTStore: store,
+		Logger:   logger,
 	}
 }
 
 // Manage obtains and manages certificates for the domain and wildcard
 // This should be called after the DNS server is started
 func (m *Manager) Manage(ctx context.Context) error {
-	// Create file storage for certificates
-	storage := &certmagic.FileStorage{Path: m.StorageDir}
+	// Create SQLite storage for certificates using the shared database
+	hostname, _ := os.Hostname()
+	storage, err := certmagicsqlite.NewWithDB(m.DB, certmagicsqlite.WithOwnerID(hostname))
+	if err != nil {
+		return fmt.Errorf("create certmagic storage: %w", err)
+	}
+	m.storage = storage
 
 	// Set the global default logger BEFORE calling NewDefault() so that
 	// internal certmagic components (cache maintainer, ACME client, etc.)
