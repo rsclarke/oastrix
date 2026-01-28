@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -213,8 +212,7 @@ func runServer(args []string, logger *zap.Logger) error {
 	httpsErrLog, _ := zap.NewStdLogAt(logger.Named("https"), zapcore.ErrorLevel)
 	if acmeMode {
 		// ACME mode: obtain certificates via Let's Encrypt DNS-01 challenge
-		storageDir := filepath.Join(filepath.Dir(dbPath), "certmagic")
-		manager := acme.NewManager(domain, acmeEmail, storageDir, acmeStaging, txtStore, logger.Named("certmagic"))
+		manager := acme.NewManager(domain, acmeEmail, database, acmeStaging, txtStore, logger.Named("certmagic"))
 
 		logger.Info("starting acme certificate acquisition", logging.Domain(domain), zap.Bool("staging", acmeStaging))
 		ctx := context.Background()

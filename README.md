@@ -158,12 +158,12 @@ sudo setcap cap_net_bind_service=+ep ./oastrix
 
 ### Certificate Storage
 
-Certificates are stored in `./certmagic/` (relative to database location). This directory contains:
+Certificates are stored in the SQLite database (`oastrix.db`) alongside other application data. This includes:
 - ACME account key
 - Certificates and private keys
 - Renewal metadata
 
-Ensure this directory persists across restarts.
+This simplifies backups—just back up the single database file.
 
 ## Troubleshooting
 
@@ -187,6 +187,5 @@ sudo setcap cap_net_bind_service=+ep ./oastrix
 ## Security Notes
 
 - API keys are shown only once at creation - store securely
-- The database contains captured request data - secure file permissions
-- Certificates directory contains private keys - restrict access (0700)
+- The database contains captured request data and TLS private keys - secure file permissions (0600)
 - Use `--pepper` or `OASTRIX_PEPPER` for consistent API key hashing across restarts
