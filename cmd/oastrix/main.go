@@ -154,12 +154,15 @@ func runServer(args []string, logger *zap.Logger) error {
 	var txtStore *acme.TXTStore
 	if acmeMode {
 		txtStore = acme.NewTXTStore()
+		// Set certmagic loggers before HTTP server starts to handle challenges
+		acme.SetLogger(logger.Named("certmagic"))
 	}
 
 	httpSrv := &server.HTTPServer{
-		DB:     database,
-		Domain: domain,
-		Logger: logger.Named("http"),
+		DB:       database,
+		Domain:   domain,
+		PublicIP: publicIP,
+		Logger:   logger.Named("http"),
 	}
 
 	httpErrLog, _ := zap.NewStdLogAt(logger.Named("http"), zapcore.ErrorLevel)
@@ -177,10 +180,11 @@ func runServer(args []string, logger *zap.Logger) error {
 	}()
 
 	apiSrv := &server.APIServer{
-		DB:     database,
-		Domain: domain,
-		Pepper: pepperBytes,
-		Logger: logger.Named("api"),
+		DB:       database,
+		Domain:   domain,
+		PublicIP: publicIP,
+		Pepper:   pepperBytes,
+		Logger:   logger.Named("api"),
 	}
 
 	apiErrLog, _ := zap.NewStdLogAt(logger.Named("api"), zapcore.ErrorLevel)
@@ -212,7 +216,7 @@ func runServer(args []string, logger *zap.Logger) error {
 	httpsErrLog, _ := zap.NewStdLogAt(logger.Named("https"), zapcore.ErrorLevel)
 	if acmeMode {
 		// ACME mode: obtain certificates via Let's Encrypt DNS-01 challenge
-		manager := acme.NewManager(domain, acmeEmail, database, acmeStaging, txtStore, logger.Named("certmagic"))
+		manager := acme.NewManager(domain, acmeEmail, database, acmeStaging, txtStore, publicIP, logger.Named("certmagic"))
 
 		logger.Info("starting acme certificate acquisition", logging.Domain(domain), zap.Bool("staging", acmeStaging))
 		ctx := context.Background()
@@ -308,14 +312,20 @@ func runGenerate(args []string) error {
 	fmt.Printf("Token: %s\n", resp.Token)
 	fmt.Println()
 	fmt.Println("Payloads:")
+	if dns, ok := resp.Payloads["dns"]; ok {
+		fmt.Printf("  dns:       %s\n", dns)
+	}
 	if http, ok := resp.Payloads["http"]; ok {
-		fmt.Printf("  %s\n", http)
+		fmt.Printf("  http:      %s\n", http)
 	}
 	if https, ok := resp.Payloads["https"]; ok {
-		fmt.Printf("  %s\n", https)
+		fmt.Printf("  https:     %s\n", https)
 	}
-	if dns, ok := resp.Payloads["dns"]; ok {
-		fmt.Printf("  %s (DNS)\n", dns)
+	if httpIP, ok := resp.Payloads["http_ip"]; ok {
+		fmt.Printf("  http_ip:   %s\n", httpIP)
+	}
+	if httpsIP, ok := resp.Payloads["https_ip"]; ok {
+		fmt.Printf("  https_ip:  %s\n", httpsIP)
 	}
 
 	return nil

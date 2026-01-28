@@ -4,7 +4,7 @@ An Out-of-Band Application Security Testing (OAST) tool for detecting blind vuln
 
 ## Features
 
-- **Automatic TLS** via Let's Encrypt (ACME with DNS-01 challenges)
+- **Automatic TLS** via Let's Encrypt (ACME with DNS-01 challenges, including IPv4 IP certificates)
 - HTTP/HTTPS request capture with full headers and body
 - DNS query capture (UDP and TCP)
 - API key authentication
@@ -48,10 +48,14 @@ Output:
 Token: abc123xyz789
 
 Payloads:
-  http://abc123xyz789.oastrix.example.com/
-  https://abc123xyz789.oastrix.example.com/
-  abc123xyz789.oastrix.example.com (DNS)
+  dns:       abc123xyz789.oastrix.example.com
+  http:      http://abc123xyz789.oastrix.example.com/
+  https:     https://abc123xyz789.oastrix.example.com/
+  http_ip:   http://203.0.113.10/oast/abc123xyz789
+  https_ip:  https://203.0.113.10/oast/abc123xyz789
 ```
+
+Note: IP-based payloads (`http_ip`, `https_ip`) only appear when `--public-ip` is configured. IPv4 IP certificates are obtained automatically via HTTP-01 challenge. IPv6 IP certificates are not yet supported due to upstream limitations.
 
 ### Check for interactions
 
@@ -117,10 +121,14 @@ The `--public-ip` flag specifies the server's external IP address. It is used fo
 
 1. **DNS A record responses** - When clients query `ns1.<domain>`, the DNS server returns this IP
 2. **ACME DNS-01 challenges** - Let's Encrypt resolves the nameserver to validate certificate requests
+3. **IP TLS certificate** - An IPv4 certificate is obtained via HTTP-01 challenge, enabling `https://<ip>/oast/<token>` interactions
+4. **IP-based interactions** - Enables `http://<ip>/oast/<token>` and `https://<ip>/oast/<token>` payloads
 
 This flag is **required** when ACME is enabled. Without it, Let's Encrypt cannot locate your DNS server to verify the `_acme-challenge` TXT records.
 
 For development with `--no-acme`, this flag is optional.
+
+**Note:** IPv6 IP certificates are not yet supported due to upstream bugs in certmagic. See [caddy#7399](https://github.com/caddyserver/caddy/issues/7399).
 
 ### CLI Flags
 

@@ -28,10 +28,11 @@ func getAPIKeyID(r *http.Request) int64 {
 }
 
 type APIServer struct {
-	DB     *sql.DB
-	Domain string
-	Pepper []byte
-	Logger *zap.Logger
+	DB       *sql.DB
+	Domain   string
+	Pepper   []byte
+	Logger   *zap.Logger
+	PublicIP string
 }
 
 func (s *APIServer) AuthMiddleware(next http.Handler) http.Handler {
@@ -168,10 +169,15 @@ func (s *APIServer) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	resp := createTokenResponse{
 		Token: tok,
 		Payloads: map[string]string{
+			"dns":   fmt.Sprintf("%s.%s", tok, s.Domain),
 			"http":  fmt.Sprintf("http://%s.%s/", tok, s.Domain),
 			"https": fmt.Sprintf("https://%s.%s/", tok, s.Domain),
-			"dns":   fmt.Sprintf("%s.%s", tok, s.Domain),
 		},
+	}
+
+	if s.PublicIP != "" {
+		resp.Payloads["http_ip"] = fmt.Sprintf("http://%s/oast/%s", s.PublicIP, tok)
+		resp.Payloads["https_ip"] = fmt.Sprintf("https://%s/oast/%s", s.PublicIP, tok)
 	}
 
 	writeJSON(w, http.StatusOK, resp)
