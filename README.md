@@ -1,10 +1,10 @@
-# Oastrix
+# oastrix
 
 An Out-of-Band Application Security Testing (OAST) tool for detecting blind vulnerabilities.
 
 ## Features
 
-- **Automatic TLS** via Let's Encrypt (ACME with DNS-01 challenges, including IPv4 IP certificates)
+- Automatic TLS via Let's Encrypt (ACME with DNS-01 challenges, including IPv4 IP certificates)
 - HTTP/HTTPS request capture with full headers and body
 - DNS query capture (UDP and TCP)
 - API key authentication
