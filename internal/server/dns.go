@@ -132,6 +132,16 @@ func (s *DNSServer) handleDNS(w dns.ResponseWriter, r *dns.Msg) {
 			continue
 		}
 
+		// Handle A queries for the base domain (required for API server access)
+		if qname == s.Domain && q.Qtype == dns.TypeA && s.PublicIP != "" {
+			rr := &dns.A{
+				Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 300},
+				A:   net.ParseIP(s.PublicIP),
+			}
+			m.Answer = append(m.Answer, rr)
+			continue
+		}
+
 		if q.Qtype == dns.TypeTXT && s.TXTStore != nil {
 			normalizedName := acme.NormalizeName(q.Name)
 			values := s.TXTStore.Get(normalizedName)
