@@ -1,8 +1,8 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -37,18 +37,11 @@ func runInteractions(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if len(resp.Interactions) == 0 {
-		fmt.Println("No interactions found.")
-		return nil
+	b, err := json.MarshalIndent(resp, "", "  ")
+	if err != nil {
+		return err
 	}
 
-	fmt.Printf("%-20s  %-4s  %-16s  %s\n", "TIME", "KIND", "REMOTE", "SUMMARY")
-	for _, i := range resp.Interactions {
-		t, _ := time.Parse(time.RFC3339, i.OccurredAt)
-		timeStr := t.Format("2006-01-02 15:04:05")
-		remote := fmt.Sprintf("%s:%d", i.RemoteIP, i.RemotePort)
-		fmt.Printf("%-20s  %-4s  %-16s  %s\n", timeStr, i.Kind, remote, i.Summary)
-	}
-
+	fmt.Fprintln(cmd.OutOrStdout(), string(b))
 	return nil
 }

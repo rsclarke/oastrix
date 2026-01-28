@@ -1,8 +1,8 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -35,21 +35,11 @@ func runList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if len(resp.Tokens) == 0 {
-		fmt.Println("No tokens found.")
-		return nil
+	b, err := json.MarshalIndent(resp, "", "  ")
+	if err != nil {
+		return err
 	}
 
-	fmt.Printf("%-14s  %-12s  %-19s  %s\n", "TOKEN", "LABEL", "CREATED", "INTERACTIONS")
-	for _, t := range resp.Tokens {
-		label := "-"
-		if t.Label != nil {
-			label = *t.Label
-		}
-		createdAt, _ := time.Parse(time.RFC3339, t.CreatedAt)
-		createdStr := createdAt.Format("2006-01-02 15:04:05")
-		fmt.Printf("%-14s  %-12s  %-19s  %d\n", t.Token, label, createdStr, t.InteractionCount)
-	}
-
+	fmt.Fprintln(cmd.OutOrStdout(), string(b))
 	return nil
 }
