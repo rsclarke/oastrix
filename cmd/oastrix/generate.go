@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -36,24 +37,11 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Token: %s\n", resp.Token)
-	fmt.Println()
-	fmt.Println("Payloads:")
-	if dns, ok := resp.Payloads["dns"]; ok {
-		fmt.Printf("  dns:       %s\n", dns)
-	}
-	if http, ok := resp.Payloads["http"]; ok {
-		fmt.Printf("  http:      %s\n", http)
-	}
-	if https, ok := resp.Payloads["https"]; ok {
-		fmt.Printf("  https:     %s\n", https)
-	}
-	if httpIP, ok := resp.Payloads["http_ip"]; ok {
-		fmt.Printf("  http_ip:   %s\n", httpIP)
-	}
-	if httpsIP, ok := resp.Payloads["https_ip"]; ok {
-		fmt.Printf("  https_ip:  %s\n", httpsIP)
+	b, err := json.MarshalIndent(resp, "", "  ")
+	if err != nil {
+		return err
 	}
 
+	fmt.Fprintln(cmd.OutOrStdout(), string(b))
 	return nil
 }

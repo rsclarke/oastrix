@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -35,6 +36,19 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Token %s deleted.\n", token)
+	result := struct {
+		Token   string `json:"token"`
+		Deleted bool   `json:"deleted"`
+	}{
+		Token:   token,
+		Deleted: true,
+	}
+
+	b, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout(), string(b))
 	return nil
 }
