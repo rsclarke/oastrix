@@ -49,6 +49,24 @@ func TestExtractToken_FromHost(t *testing.T) {
 			domain:   "oastrix.example.com",
 			expected: "",
 		},
+		{
+			name:     "IPv4 with port",
+			host:     "1.2.3.4:443",
+			domain:   "oastrix.example.com",
+			expected: "",
+		},
+		{
+			name:     "IPv6 with port",
+			host:     "[2001:db8::1]:443",
+			domain:   "oastrix.example.com",
+			expected: "",
+		},
+		{
+			name:     "IPv6 without port",
+			host:     "2001:db8::1",
+			domain:   "oastrix.example.com",
+			expected: "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -212,4 +230,119 @@ func setupTestDB(t *testing.T) *sql.DB {
 		database.Close()
 	})
 	return database
+}
+
+func TestIsValidHost(t *testing.T) {
+	srv := &HTTPServer{
+		Domain:   "oastrix.example.com",
+		PublicIP: "203.0.113.10",
+	}
+
+	tests := []struct {
+		name  string
+		host  string
+		valid bool
+	}{
+		{"subdomain", "token.oastrix.example.com", true},
+		{"subdomain with port", "token.oastrix.example.com:443", true},
+		{"exact domain", "oastrix.example.com", true},
+		{"exact domain with port", "oastrix.example.com:443", true},
+		{"public IP", "203.0.113.10", true},
+		{"public IP with port", "203.0.113.10:443", true},
+		{"unrecognized domain", "evil.com", false},
+		{"unrecognized IP", "1.2.3.4", false},
+		{"empty host", "", false},
+		{"IPv6 public IP", "[2001:db8::1]", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := srv.isValidHost(tt.host)
+			if got != tt.valid {
+				t.Errorf("isValidHost(%q) = %v, want %v", tt.host, got, tt.valid)
+			}
+		})
+	}
+}
+
+func TestIsValidHost_IPv6PublicIP(t *testing.T) {
+	srv := &HTTPServer{
+		Domain:   "oastrix.example.com",
+		PublicIP: "2001:db8::1",
+	}
+
+	tests := []struct {
+		name  string
+		host  string
+		valid bool
+	}{
+		{"IPv6 with brackets and port", "[2001:db8::1]:443", true},
+		{"IPv6 with brackets", "[2001:db8::1]", true},
+		{"IPv6 bare", "2001:db8::1", true},
+		{"wrong IPv6", "2001:db8::2", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := srv.isValidHost(tt.host)
+			if got != tt.valid {
+				t.Errorf("isValidHost(%q) = %v, want %v", tt.host, got, tt.valid)
+			}
+		})
+	}
+}
+
+func TestHTTPServer_InvalidHostReturns404(t *testing.T) {
+	database := setupTestDB(t)
+
+	srv := &HTTPServer{
+		DB:       database,
+		Domain:   "oastrix.example.com",
+		PublicIP: "203.0.113.10",
+		Logger:   zap.NewNop(),
+	}
+
+	req := httptest.NewRequest("GET", "http://evil.com/oast/token123", nil)
+	req.Host = "evil.com"
+
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected status 404 for invalid host, got %d", rec.Code)
+	}
+}
+
+func TestHTTPServer_ValidHostsAccepted(t *testing.T) {
+	database := setupTestDB(t)
+
+	srv := &HTTPServer{
+		DB:       database,
+		Domain:   "oastrix.example.com",
+		PublicIP: "203.0.113.10",
+		Logger:   zap.NewNop(),
+	}
+
+	tests := []struct {
+		name string
+		host string
+	}{
+		{"subdomain", "token.oastrix.example.com"},
+		{"domain with path", "oastrix.example.com"},
+		{"public IP", "203.0.113.10"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "http://"+tt.host+"/", nil)
+			req.Host = tt.host
+
+			rec := httptest.NewRecorder()
+			srv.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Errorf("expected status 200 for valid host %q, got %d", tt.host, rec.Code)
+			}
+		})
+	}
 }
