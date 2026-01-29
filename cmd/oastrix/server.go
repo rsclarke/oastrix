@@ -212,7 +212,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 	httpServer.Shutdown(ctx)
 	apiServer.Shutdown(ctx)
-	dnsSrv.Shutdown()
+	dnsSrv.Shutdown(ctx)
 
 	return nil
 }

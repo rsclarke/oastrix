@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"net"
@@ -77,14 +78,14 @@ func (s *DNSServer) Start(udpPort, tcpPort int) error {
 	return nil
 }
 
-func (s *DNSServer) Shutdown() {
+func (s *DNSServer) Shutdown(ctx context.Context) {
 	if s.udpServer != nil {
-		if err := s.udpServer.Shutdown(); err != nil {
+		if err := s.udpServer.ShutdownContext(ctx); err != nil {
 			s.Logger.Warn("dns udp shutdown error", zap.Error(err))
 		}
 	}
 	if s.tcpServer != nil {
-		if err := s.tcpServer.Shutdown(); err != nil {
+		if err := s.tcpServer.ShutdownContext(ctx); err != nil {
 			s.Logger.Warn("dns tcp shutdown error", zap.Error(err))
 		}
 	}
