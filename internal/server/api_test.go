@@ -27,9 +27,7 @@ func setupTestAPIServer(t *testing.T) (*APIServer, string, func()) {
 		t.Fatalf("open database: %v", err)
 	}
 
-	pepper := []byte("test-pepper-12345")
-
-	displayKey, prefix, hash, err := auth.GenerateAPIKey(pepper)
+	displayKey, prefix, hash, err := auth.GenerateAPIKey()
 	if err != nil {
 		database.Close()
 		os.Remove(tmpFile.Name())
@@ -46,7 +44,6 @@ func setupTestAPIServer(t *testing.T) (*APIServer, string, func()) {
 	srv := &APIServer{
 		DB:     database,
 		Domain: "oastrix.example.com",
-		Pepper: pepper,
 	}
 
 	cleanup := func() {
@@ -287,7 +284,7 @@ func TestTokenOwnership_CannotAccessOtherKeysToken(t *testing.T) {
 	tokenValue := createResp.Token
 
 	// Create a second API key
-	displayKey2, prefix2, hash2, err := auth.GenerateAPIKey(srv.Pepper)
+	displayKey2, prefix2, hash2, err := auth.GenerateAPIKey()
 	if err != nil {
 		t.Fatalf("generate second API key: %v", err)
 	}

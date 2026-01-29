@@ -6,9 +6,7 @@ import (
 )
 
 func TestGenerateAPIKey(t *testing.T) {
-	pepper := []byte("test-pepper")
-
-	displayKey, prefix, hash, err := GenerateAPIKey(pepper)
+	displayKey, prefix, hash, err := GenerateAPIKey()
 	if err != nil {
 		t.Fatalf("GenerateAPIKey failed: %v", err)
 	}
@@ -47,46 +45,38 @@ func TestGenerateAPIKey(t *testing.T) {
 }
 
 func TestHashSecretDeterministic(t *testing.T) {
-	pepper := []byte("test-pepper")
 	secret := "test-secret-value"
 
-	hash1 := HashSecret(secret, pepper)
-	hash2 := HashSecret(secret, pepper)
+	hash1 := HashSecret(secret)
+	hash2 := HashSecret(secret)
 
 	if string(hash1) != string(hash2) {
 		t.Error("HashSecret is not deterministic")
 	}
 
-	differentPepper := []byte("different-pepper")
-	hash3 := HashSecret(secret, differentPepper)
+	differentSecret := "different-secret"
+	hash3 := HashSecret(differentSecret)
 	if string(hash1) == string(hash3) {
-		t.Error("HashSecret should produce different results with different pepper")
+		t.Error("HashSecret should produce different results with different secret")
 	}
 }
 
 func TestVerifyAPIKey(t *testing.T) {
-	pepper := []byte("test-pepper")
-
-	displayKey, _, hash, err := GenerateAPIKey(pepper)
+	displayKey, _, hash, err := GenerateAPIKey()
 	if err != nil {
 		t.Fatalf("GenerateAPIKey failed: %v", err)
 	}
 
-	if !VerifyAPIKey(displayKey, hash, pepper) {
+	if !VerifyAPIKey(displayKey, hash) {
 		t.Error("VerifyAPIKey should return true for valid key")
 	}
 
-	if VerifyAPIKey("oastrix_invalid12345_key", hash, pepper) {
+	if VerifyAPIKey("oastrix_invalid12345_key", hash) {
 		t.Error("VerifyAPIKey should return false for invalid key")
 	}
 
-	wrongPepper := []byte("wrong-pepper")
-	if VerifyAPIKey(displayKey, hash, wrongPepper) {
-		t.Error("VerifyAPIKey should return false with wrong pepper")
-	}
-
 	wrongHash := make([]byte, 32)
-	if VerifyAPIKey(displayKey, wrongHash, pepper) {
+	if VerifyAPIKey(displayKey, wrongHash) {
 		t.Error("VerifyAPIKey should return false with wrong hash")
 	}
 }

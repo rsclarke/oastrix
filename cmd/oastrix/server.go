@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/tls"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"os"
@@ -31,7 +29,6 @@ var serverFlags struct {
 	tlsKey      string
 	domain      string
 	dbPath      string
-	pepper      string
 	noACME      bool
 	acmeEmail   string
 	acmeStaging bool
@@ -70,23 +67,12 @@ func init() {
 	serverCmd.Flags().StringVar(&serverFlags.domain, "domain", getEnv("OASTRIX_DOMAIN", "localhost"), "domain for token extraction")
 	serverCmd.Flags().StringVar(&serverFlags.publicIP, "public-ip", getEnv("OASTRIX_PUBLIC_IP", ""), "public IP for DNS responses (required for ACME)")
 	serverCmd.Flags().StringVar(&serverFlags.dbPath, "db", getEnv("OASTRIX_DB", "oastrix.db"), "database path")
-	serverCmd.Flags().StringVar(&serverFlags.pepper, "pepper", os.Getenv("OASTRIX_PEPPER"), "HMAC pepper for API key hashing")
 	serverCmd.Flags().BoolVar(&serverFlags.noACME, "no-acme", false, "disable automatic TLS (ACME)")
 	serverCmd.Flags().StringVar(&serverFlags.acmeEmail, "acme-email", "", "email for Let's Encrypt notifications")
 	serverCmd.Flags().BoolVar(&serverFlags.acmeStaging, "acme-staging", false, "use Let's Encrypt staging CA")
 }
 
 func runServer(cmd *cobra.Command, args []string) error {
-	pepper := serverFlags.pepper
-	if pepper == "" {
-		pepperBytes := make([]byte, 32)
-		if _, err := rand.Read(pepperBytes); err != nil {
-			return fmt.Errorf("generate pepper: %w", err)
-		}
-		pepper = base64.StdEncoding.EncodeToString(pepperBytes)
-	}
-	pepperBytes := []byte(pepper)
-
 	database, err := db.Open(serverFlags.dbPath)
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
@@ -98,7 +84,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("count API keys: %w", err)
 	}
 	if count == 0 {
-		displayKey, prefix, hash, err := auth.GenerateAPIKey(pepperBytes)
+		displayKey, prefix, hash, err := auth.GenerateAPIKey()
 		if err != nil {
 			return fmt.Errorf("generate API key: %w", err)
 		}
@@ -153,7 +139,6 @@ func runServer(cmd *cobra.Command, args []string) error {
 		DB:       database,
 		Domain:   serverFlags.domain,
 		PublicIP: serverFlags.publicIP,
-		Pepper:   pepperBytes,
 		Logger:   logger.Named("api"),
 	}
 
