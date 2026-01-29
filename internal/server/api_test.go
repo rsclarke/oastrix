@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/rsclarke/oastrix/internal/api"
 	"github.com/rsclarke/oastrix/internal/auth"
 	"github.com/rsclarke/oastrix/internal/db"
 )
@@ -138,7 +139,7 @@ func TestCreateToken(t *testing.T) {
 		t.Errorf("expected status 200, got %d", w.Code)
 	}
 
-	var resp createTokenResponse
+	var resp api.CreateTokenResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -167,7 +168,7 @@ func TestGetInteractions(t *testing.T) {
 	createW := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(createW, createReq)
 
-	var createResp createTokenResponse
+	var createResp api.CreateTokenResponse
 	json.NewDecoder(createW.Body).Decode(&createResp)
 
 	req := httptest.NewRequest("GET", "/v1/tokens/"+createResp.Token+"/interactions", nil)
@@ -180,7 +181,7 @@ func TestGetInteractions(t *testing.T) {
 		t.Errorf("expected status 200, got %d", w.Code)
 	}
 
-	var resp getInteractionsResponse
+	var resp api.GetInteractionsResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -218,7 +219,7 @@ func TestDeleteToken(t *testing.T) {
 	createW := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(createW, createReq)
 
-	var createResp createTokenResponse
+	var createResp api.CreateTokenResponse
 	json.NewDecoder(createW.Body).Decode(&createResp)
 
 	req := httptest.NewRequest("DELETE", "/v1/tokens/"+createResp.Token, nil)
@@ -279,7 +280,7 @@ func TestTokenOwnership_CannotAccessOtherKeysToken(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", createW.Code)
 	}
 
-	var createResp createTokenResponse
+	var createResp api.CreateTokenResponse
 	json.NewDecoder(createW.Body).Decode(&createResp)
 	tokenValue := createResp.Token
 
