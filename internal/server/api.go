@@ -1,10 +1,12 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -117,8 +119,21 @@ func (s *APIServer) handleListTokens(w http.ResponseWriter, r *http.Request) {
 func (s *APIServer) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	var req api.CreateTokenRequest
 	if r.Body != nil {
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<16) // 64KB limit
+		dec := json.NewDecoder(r.Body)
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil && err != io.EOF {
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "request body too large"})
+				return
+			}
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
+		// Ensure no trailing data
+		if dec.Decode(&struct{}{}) != io.EOF {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unexpected trailing data"})
 			return
 		}
 	}
@@ -280,9 +295,12 @@ func (s *APIServer) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
+	buf := new(bytes.Buffer)
+	if err := json.NewEncoder(buf).Encode(data); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-	}
+	w.Write(buf.Bytes())
 }
