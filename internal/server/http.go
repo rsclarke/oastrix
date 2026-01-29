@@ -139,6 +139,7 @@ func (s *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	headersJSON, _ := json.Marshal(headers)
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB limit
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		s.Logger.Warn("read body failed", zap.Error(err))
