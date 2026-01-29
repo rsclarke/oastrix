@@ -146,16 +146,6 @@ func (s *APIServer) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existing, err := db.GetTokenByValue(s.DB, tok)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "database error"})
-		return
-	}
-	if existing != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "token collision, please retry"})
-		return
-	}
-
 	var labelPtr *string
 	if req.Label != "" {
 		labelPtr = &req.Label
