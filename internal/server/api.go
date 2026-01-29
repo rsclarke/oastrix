@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rsclarke/oastrix/internal/api"
 	"github.com/rsclarke/oastrix/internal/auth"
 	"github.com/rsclarke/oastrix/internal/db"
 	"github.com/rsclarke/oastrix/internal/token"
@@ -88,25 +89,7 @@ func (s *APIServer) Handler() http.Handler {
 	return s.AuthMiddleware(mux)
 }
 
-type createTokenRequest struct {
-	Label string `json:"label"`
-}
 
-type createTokenResponse struct {
-	Token    string            `json:"token"`
-	Payloads map[string]string `json:"payloads"`
-}
-
-type listTokensResponse struct {
-	Tokens []tokenInfo `json:"tokens"`
-}
-
-type tokenInfo struct {
-	Token            string  `json:"token"`
-	Label            *string `json:"label"`
-	CreatedAt        string  `json:"created_at"`
-	InteractionCount int     `json:"interaction_count"`
-}
 
 func (s *APIServer) handleListTokens(w http.ResponseWriter, r *http.Request) {
 	apiKeyID := getAPIKeyID(r)
@@ -116,11 +99,11 @@ func (s *APIServer) handleListTokens(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := listTokensResponse{
-		Tokens: make([]tokenInfo, 0, len(tokens)),
+	resp := api.ListTokensResponse{
+		Tokens: make([]api.TokenInfo, 0, len(tokens)),
 	}
 	for _, t := range tokens {
-		resp.Tokens = append(resp.Tokens, tokenInfo{
+		resp.Tokens = append(resp.Tokens, api.TokenInfo{
 			Token:            t.Token,
 			Label:            t.Label,
 			CreatedAt:        time.Unix(t.CreatedAt, 0).UTC().Format(time.RFC3339),
@@ -132,7 +115,7 @@ func (s *APIServer) handleListTokens(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *APIServer) handleCreateToken(w http.ResponseWriter, r *http.Request) {
-	var req createTokenRequest
+	var req api.CreateTokenRequest
 	if r.Body != nil {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
@@ -159,7 +142,7 @@ func (s *APIServer) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := createTokenResponse{
+	resp := api.CreateTokenResponse{
 		Token: tok,
 		Payloads: map[string]string{
 			"dns":   fmt.Sprintf("%s.%s", tok, s.Domain),
@@ -176,42 +159,7 @@ func (s *APIServer) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-type interactionResponse struct {
-	ID         int64                 `json:"id"`
-	Kind       string                `json:"kind"`
-	OccurredAt string                `json:"occurred_at"`
-	RemoteIP   string                `json:"remote_ip"`
-	RemotePort int                   `json:"remote_port"`
-	TLS        bool                  `json:"tls"`
-	Summary    string                `json:"summary"`
-	HTTP       *httpInteractionDetail `json:"http,omitempty"`
-	DNS        *dnsInteractionDetail  `json:"dns,omitempty"`
-}
 
-type httpInteractionDetail struct {
-	Method  string              `json:"method"`
-	Scheme  string              `json:"scheme"`
-	Host    string              `json:"host"`
-	Path    string              `json:"path"`
-	Query   string              `json:"query"`
-	Headers map[string][]string `json:"headers"`
-	Body    string              `json:"body"`
-}
-
-type dnsInteractionDetail struct {
-	QName    string `json:"qname"`
-	QType    int    `json:"qtype"`
-	QClass   int    `json:"qclass"`
-	RD       bool   `json:"rd"`
-	Opcode   int    `json:"opcode"`
-	DNSID    int    `json:"dns_id"`
-	Protocol string `json:"protocol"`
-}
-
-type getInteractionsResponse struct {
-	Token        string                `json:"token"`
-	Interactions []interactionResponse `json:"interactions"`
-}
 
 func (s *APIServer) handleGetInteractions(w http.ResponseWriter, r *http.Request) {
 	tokenValue := r.PathValue("token")
@@ -243,13 +191,13 @@ func (s *APIServer) handleGetInteractions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	resp := getInteractionsResponse{
+	resp := api.GetInteractionsResponse{
 		Token:        tokenValue,
-		Interactions: make([]interactionResponse, 0, len(interactions)),
+		Interactions: make([]api.InteractionResponse, 0, len(interactions)),
 	}
 
 	for _, i := range interactions {
-		ir := interactionResponse{
+		ir := api.InteractionResponse{
 			ID:         i.ID,
 			Kind:       i.Kind,
 			OccurredAt: time.Unix(i.OccurredAt, 0).UTC().Format(time.RFC3339),
@@ -265,7 +213,7 @@ func (s *APIServer) handleGetInteractions(w http.ResponseWriter, r *http.Request
 				var headers map[string][]string
 				json.Unmarshal([]byte(httpInt.RequestHeaders), &headers)
 
-				ir.HTTP = &httpInteractionDetail{
+				ir.HTTP = &api.HTTPInteractionDetail{
 					Method:  httpInt.Method,
 					Scheme:  httpInt.Scheme,
 					Host:    httpInt.Host,
@@ -280,7 +228,7 @@ func (s *APIServer) handleGetInteractions(w http.ResponseWriter, r *http.Request
 		if i.Kind == "dns" {
 			dnsInt, err := db.GetDNSInteraction(s.DB, i.ID)
 			if err == nil && dnsInt != nil {
-				ir.DNS = &dnsInteractionDetail{
+				ir.DNS = &api.DNSInteractionDetail{
 					QName:    dnsInt.QName,
 					QType:    dnsInt.QType,
 					QClass:   dnsInt.QClass,
@@ -328,7 +276,7 @@ func (s *APIServer) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]bool{"deleted": true})
+	writeJSON(w, http.StatusOK, api.DeleteTokenResponse{Deleted: true})
 }
 
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
