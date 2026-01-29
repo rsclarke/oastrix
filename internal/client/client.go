@@ -6,17 +6,38 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
-type Client struct {
-	BaseURL string
-	APIKey  string
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
 }
 
-func NewClient(baseURL, apiKey string) *Client {
-	return &Client{
+type Client struct {
+	BaseURL    string
+	APIKey     string
+	httpClient HTTPClient
+}
+
+func NewClient(baseURL, apiKey string, opts ...Option) *Client {
+	c := &Client{
 		BaseURL: baseURL,
 		APIKey:  apiKey,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
+}
+
+type Option func(*Client)
+
+func WithHTTPClient(httpClient HTTPClient) Option {
+	return func(c *Client) {
+		c.httpClient = httpClient
 	}
 }
 
@@ -95,7 +116,7 @@ func (c *Client) CreateToken(label string) (*CreateTokenResponse, error) {
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +140,7 @@ func (c *Client) GetInteractions(token string) (*GetInteractionsResponse, error)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +164,7 @@ func (c *Client) ListTokens() (*ListTokensResponse, error) {
 	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +188,7 @@ func (c *Client) DeleteToken(token string) error {
 	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
