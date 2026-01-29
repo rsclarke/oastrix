@@ -209,23 +209,10 @@ func (s *DNSServer) handleDNS(w dns.ResponseWriter, r *dns.Msg) {
 			s.Logger.Error("create dns interaction details failed", zap.Error(err))
 		}
 
-		switch q.Qtype {
-		case dns.TypeA:
+		if q.Qtype == dns.TypeA {
 			rr := &dns.A{
 				Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
-				A:   net.ParseIP("127.0.0.1"),
-			}
-			m.Answer = append(m.Answer, rr)
-		case dns.TypeAAAA:
-			rr := &dns.AAAA{
-				Hdr:  dns.RR_Header{Name: q.Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: 60},
-				AAAA: net.ParseIP("::1"),
-			}
-			m.Answer = append(m.Answer, rr)
-		default:
-			rr := &dns.A{
-				Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
-				A:   net.ParseIP("127.0.0.1"),
+				A:   net.ParseIP(s.PublicIP),
 			}
 			m.Answer = append(m.Answer, rr)
 		}
