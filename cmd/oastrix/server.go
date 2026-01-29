@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/rsclarke/oastrix/internal/acme"
 	"github.com/rsclarke/oastrix/internal/auth"
@@ -133,9 +134,12 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	httpErrLog, _ := zap.NewStdLogAt(logger.Named("http"), zapcore.ErrorLevel)
 	httpServer := &http.Server{
-		Addr:     fmt.Sprintf(":%d", serverFlags.httpPort),
-		Handler:  httpSrv,
-		ErrorLog: httpErrLog,
+		Addr:              fmt.Sprintf(":%d", serverFlags.httpPort),
+		Handler:           httpSrv,
+		ErrorLog:          httpErrLog,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
 	}
 
 	go func() {
@@ -155,9 +159,12 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	apiErrLog, _ := zap.NewStdLogAt(logger.Named("api"), zapcore.ErrorLevel)
 	apiServer := &http.Server{
-		Addr:     fmt.Sprintf(":%d", serverFlags.apiPort),
-		Handler:  apiSrv.Handler(),
-		ErrorLog: apiErrLog,
+		Addr:              fmt.Sprintf(":%d", serverFlags.apiPort),
+		Handler:           apiSrv.Handler(),
+		ErrorLog:          apiErrLog,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
 	}
 
 	go func() {
@@ -191,10 +198,13 @@ func runServer(cmd *cobra.Command, args []string) error {
 		logger.Info("acme certificate obtained", logging.Domain(serverFlags.domain))
 
 		httpsServer = &http.Server{
-			Addr:      fmt.Sprintf(":%d", serverFlags.httpsPort),
-			Handler:   httpSrv,
-			TLSConfig: manager.TLSConfig(),
-			ErrorLog:  httpsErrLog,
+			Addr:              fmt.Sprintf(":%d", serverFlags.httpsPort),
+			Handler:           httpSrv,
+			TLSConfig:         manager.TLSConfig(),
+			ErrorLog:          httpsErrLog,
+			ReadHeaderTimeout: 10 * time.Second,
+			ReadTimeout:       30 * time.Second,
+			WriteTimeout:      30 * time.Second,
 		}
 
 		go func() {
@@ -214,10 +224,13 @@ func runServer(cmd *cobra.Command, args []string) error {
 		}
 
 		httpsServer = &http.Server{
-			Addr:      fmt.Sprintf(":%d", serverFlags.httpsPort),
-			Handler:   httpSrv,
-			TLSConfig: tlsConfig,
-			ErrorLog:  httpsErrLog,
+			Addr:              fmt.Sprintf(":%d", serverFlags.httpsPort),
+			Handler:           httpSrv,
+			TLSConfig:         tlsConfig,
+			ErrorLog:          httpsErrLog,
+			ReadHeaderTimeout: 10 * time.Second,
+			ReadTimeout:       30 * time.Second,
+			WriteTimeout:      30 * time.Second,
 		}
 
 		go func() {
@@ -236,7 +249,9 @@ func runServer(cmd *cobra.Command, args []string) error {
 
 	logger.Info("shutting down")
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	if httpsServer != nil {
 		httpsServer.Shutdown(ctx)
 	}
