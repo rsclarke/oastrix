@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"net"
@@ -39,40 +40,54 @@ func (s *DNSServer) Start(udpPort, tcpPort int) error {
 		Handler: handler,
 	}
 
-	udpReady := make(chan error, 1)
-	tcpReady := make(chan error, 1)
+	udpErrCh := make(chan error, 1)
+	tcpErrCh := make(chan error, 1)
 
 	go func() {
 		s.Logger.Info("starting dns server", logging.Net("udp"), logging.Port(udpPort))
-		udpReady <- s.udpServer.ListenAndServe()
+		if err := s.udpServer.ListenAndServe(); err != nil {
+			udpErrCh <- err
+		}
+		close(udpErrCh)
 	}()
 
 	go func() {
 		s.Logger.Info("starting dns server", logging.Net("tcp"), logging.Port(tcpPort))
-		tcpReady <- s.tcpServer.ListenAndServe()
+		if err := s.tcpServer.ListenAndServe(); err != nil {
+			tcpErrCh <- err
+		}
+		close(tcpErrCh)
 	}()
 
-	select {
-	case err := <-udpReady:
-		if err != nil {
-			return fmt.Errorf("UDP DNS server failed to start: %w", err)
+	timeout := time.After(100 * time.Millisecond)
+	for i := 0; i < 2; i++ {
+		select {
+		case err := <-udpErrCh:
+			if err != nil {
+				return fmt.Errorf("UDP DNS server failed to start: %w", err)
+			}
+		case err := <-tcpErrCh:
+			if err != nil {
+				return fmt.Errorf("TCP DNS server failed to start: %w", err)
+			}
+		case <-timeout:
+			return nil
 		}
-	case err := <-tcpReady:
-		if err != nil {
-			return fmt.Errorf("TCP DNS server failed to start: %w", err)
-		}
-	case <-time.After(100 * time.Millisecond):
 	}
 
 	return nil
 }
 
-func (s *DNSServer) Shutdown() {
+func (s *DNSServer) Shutdown(ctx context.Context) {
 	if s.udpServer != nil {
-		s.udpServer.Shutdown()
+		if err := s.udpServer.ShutdownContext(ctx); err != nil {
+			s.Logger.Warn("dns udp shutdown error", zap.Error(err))
+		}
 	}
 	if s.tcpServer != nil {
-		s.tcpServer.Shutdown()
+		if err := s.tcpServer.ShutdownContext(ctx); err != nil {
+			s.Logger.Warn("dns tcp shutdown error", zap.Error(err))
+		}
 	}
 }
 
