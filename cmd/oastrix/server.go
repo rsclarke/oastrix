@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,7 +16,6 @@ import (
 	"github.com/rsclarke/oastrix/internal/server"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 var serverFlags struct {
@@ -118,22 +116,15 @@ func runServer(cmd *cobra.Command, args []string) error {
 		Logger:   logger.Named("http"),
 	}
 
-	httpErrLog, _ := zap.NewStdLogAt(logger.Named("http"), zapcore.ErrorLevel)
-	httpServer := &http.Server{
-		Addr:              fmt.Sprintf(":%d", serverFlags.httpPort),
-		Handler:           httpSrv,
-		ErrorLog:          httpErrLog,
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
-	}
+	httpLogger := logger.Named("http")
+	httpCfg := server.DefaultServerConfig(fmt.Sprintf(":%d", serverFlags.httpPort), httpSrv, httpLogger)
+	httpServer := server.NewManagedServer("http", httpCfg)
 
-	go func() {
-		logger.Info("starting http server", logging.Port(serverFlags.httpPort))
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("http server error", zap.Error(err))
-		}
-	}()
+	logger.Info("starting http server", logging.Port(serverFlags.httpPort))
+	httpServer.Start()
+	if err := httpServer.WaitForStartup(100 * time.Millisecond); err != nil {
+		return fmt.Errorf("http server: %w", err)
+	}
 
 	apiSrv := &server.APIServer{
 		DB:       database,
@@ -142,22 +133,15 @@ func runServer(cmd *cobra.Command, args []string) error {
 		Logger:   logger.Named("api"),
 	}
 
-	apiErrLog, _ := zap.NewStdLogAt(logger.Named("api"), zapcore.ErrorLevel)
-	apiServer := &http.Server{
-		Addr:              fmt.Sprintf(":%d", serverFlags.apiPort),
-		Handler:           apiSrv.Handler(),
-		ErrorLog:          apiErrLog,
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
-	}
+	apiLogger := logger.Named("api")
+	apiCfg := server.DefaultServerConfig(fmt.Sprintf(":%d", serverFlags.apiPort), apiSrv.Handler(), apiLogger)
+	apiServer := server.NewManagedServer("api", apiCfg)
 
-	go func() {
-		logger.Info("starting api server", logging.Port(serverFlags.apiPort))
-		if err := apiServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("api server error", zap.Error(err))
-		}
-	}()
+	logger.Info("starting api server", logging.Port(serverFlags.apiPort))
+	apiServer.Start()
+	if err := apiServer.WaitForStartup(100 * time.Millisecond); err != nil {
+		return fmt.Errorf("api server: %w", err)
+	}
 
 	dnsSrv := &server.DNSServer{
 		DB:       database,
@@ -170,8 +154,8 @@ func runServer(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("start DNS server: %w", err)
 	}
 
-	var httpsServer *http.Server
-	httpsErrLog, _ := zap.NewStdLogAt(logger.Named("https"), zapcore.ErrorLevel)
+	var httpsServer *server.ManagedServer
+	httpsLogger := logger.Named("https")
 	if acmeMode {
 		manager := acme.NewManager(serverFlags.domain, serverFlags.acmeEmail, database, serverFlags.acmeStaging, txtStore, serverFlags.publicIP, logger.Named("certmagic"))
 
@@ -182,22 +166,15 @@ func runServer(cmd *cobra.Command, args []string) error {
 		}
 		logger.Info("acme certificate obtained", logging.Domain(serverFlags.domain))
 
-		httpsServer = &http.Server{
-			Addr:              fmt.Sprintf(":%d", serverFlags.httpsPort),
-			Handler:           httpSrv,
-			TLSConfig:         manager.TLSConfig(),
-			ErrorLog:          httpsErrLog,
-			ReadHeaderTimeout: 10 * time.Second,
-			ReadTimeout:       30 * time.Second,
-			WriteTimeout:      30 * time.Second,
-		}
+		httpsCfg := server.DefaultServerConfig(fmt.Sprintf(":%d", serverFlags.httpsPort), httpSrv, httpsLogger)
+		httpsCfg.TLSConfig = manager.TLSConfig()
+		httpsServer = server.NewManagedServer("https", httpsCfg)
 
-		go func() {
-			logger.Info("starting https server", logging.Port(serverFlags.httpsPort), logging.TLSMode("acme"))
-			if err := httpsServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-				logger.Error("https server error", zap.Error(err))
-			}
-		}()
+		logger.Info("starting https server", logging.Port(serverFlags.httpsPort), logging.TLSMode("acme"))
+		httpsServer.Start()
+		if err := httpsServer.WaitForStartup(100 * time.Millisecond); err != nil {
+			return fmt.Errorf("https server: %w", err)
+		}
 	} else if manualTLS {
 		cert, err := tls.LoadX509KeyPair(serverFlags.tlsCert, serverFlags.tlsKey)
 		if err != nil {
@@ -208,22 +185,15 @@ func runServer(cmd *cobra.Command, args []string) error {
 			Certificates: []tls.Certificate{cert},
 		}
 
-		httpsServer = &http.Server{
-			Addr:              fmt.Sprintf(":%d", serverFlags.httpsPort),
-			Handler:           httpSrv,
-			TLSConfig:         tlsConfig,
-			ErrorLog:          httpsErrLog,
-			ReadHeaderTimeout: 10 * time.Second,
-			ReadTimeout:       30 * time.Second,
-			WriteTimeout:      30 * time.Second,
-		}
+		httpsCfg := server.DefaultServerConfig(fmt.Sprintf(":%d", serverFlags.httpsPort), httpSrv, httpsLogger)
+		httpsCfg.TLSConfig = tlsConfig
+		httpsServer = server.NewManagedServer("https", httpsCfg)
 
-		go func() {
-			logger.Info("starting https server", logging.Port(serverFlags.httpsPort), logging.TLSMode("manual"))
-			if err := httpsServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-				logger.Error("https server error", zap.Error(err))
-			}
-		}()
+		logger.Info("starting https server", logging.Port(serverFlags.httpsPort), logging.TLSMode("manual"))
+		httpsServer.Start()
+		if err := httpsServer.WaitForStartup(100 * time.Millisecond); err != nil {
+			return fmt.Errorf("https server: %w", err)
+		}
 	} else {
 		logger.Info("https disabled", zap.String("reason", "no-acme specified without manual TLS certificates"))
 	}
