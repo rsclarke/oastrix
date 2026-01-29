@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"os"
@@ -11,7 +13,6 @@ import (
 
 	"github.com/rsclarke/oastrix/internal/acme"
 	"github.com/rsclarke/oastrix/internal/auth"
-	"github.com/rsclarke/oastrix/internal/config"
 	"github.com/rsclarke/oastrix/internal/db"
 	"github.com/rsclarke/oastrix/internal/logging"
 	"github.com/rsclarke/oastrix/internal/server"
@@ -77,11 +78,11 @@ func init() {
 func runServer(cmd *cobra.Command, args []string) error {
 	pepper := serverFlags.pepper
 	if pepper == "" {
-		loadedCfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("load config: %w", err)
+		pepperBytes := make([]byte, 32)
+		if _, err := rand.Read(pepperBytes); err != nil {
+			return fmt.Errorf("generate pepper: %w", err)
 		}
-		pepper = loadedCfg.Pepper
+		pepper = base64.StdEncoding.EncodeToString(pepperBytes)
 	}
 	pepperBytes := []byte(pepper)
 
