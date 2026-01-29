@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -134,7 +135,10 @@ func (s *APIServer) handleListTokens(w http.ResponseWriter, r *http.Request) {
 func (s *APIServer) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	var req createTokenRequest
 	if r.Body != nil {
-		json.NewDecoder(r.Body).Decode(&req)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+			return
+		}
 	}
 
 	tok, err := token.Generate()
@@ -341,5 +345,7 @@ func (s *APIServer) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
 }

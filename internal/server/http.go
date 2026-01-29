@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/caddyserver/certmagic"
@@ -113,8 +114,7 @@ func (s *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		remoteIP = r.RemoteAddr
 		remotePortStr = "0"
 	}
-	var remotePort int
-	fmt.Sscanf(remotePortStr, "%d", &remotePort)
+	remotePort, _ := strconv.Atoi(remotePortStr)
 
 	tls := r.TLS != nil
 
