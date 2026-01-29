@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -18,7 +17,7 @@ const (
 
 var ErrInvalidKeyFormat = errors.New("invalid API key format")
 
-func GenerateAPIKey(pepper []byte) (displayKey string, prefix string, hash []byte, err error) {
+func GenerateAPIKey() (displayKey string, prefix string, hash []byte, err error) {
 	prefixBytes := make([]byte, prefixLength)
 	if _, err := rand.Read(prefixBytes); err != nil {
 		return "", "", nil, err
@@ -35,23 +34,22 @@ func GenerateAPIKey(pepper []byte) (displayKey string, prefix string, hash []byt
 	secret := encodeBase62(secretRaw)
 
 	displayKey = servicePrefix + "_" + prefix + "_" + secret
-	hash = HashSecret(secret, pepper)
+	hash = HashSecret(secret)
 
 	return displayKey, prefix, hash, nil
 }
 
-func HashSecret(secret string, pepper []byte) []byte {
-	h := hmac.New(sha256.New, pepper)
-	h.Write([]byte(secret))
-	return h.Sum(nil)
+func HashSecret(secret string) []byte {
+	h := sha256.Sum256([]byte(secret))
+	return h[:]
 }
 
-func VerifyAPIKey(displayKey string, storedHash []byte, pepper []byte) bool {
+func VerifyAPIKey(displayKey string, storedHash []byte) bool {
 	prefix, secret, err := ParseAPIKey(displayKey)
 	if err != nil || prefix == "" {
 		return false
 	}
-	computedHash := HashSecret(secret, pepper)
+	computedHash := HashSecret(secret)
 	return subtle.ConstantTimeCompare(computedHash, storedHash) == 1
 }
 

@@ -95,7 +95,6 @@ TIME                  KIND  REMOTE            SUMMARY
 | --dns-port | OASTRIX_DNS_PORT | 53 | DNS server port |
 | --public-ip | OASTRIX_PUBLIC_IP | - | Public IP address of the server (see below) |
 | --db | OASTRIX_DB | oastrix.db | SQLite database path |
-| --pepper | OASTRIX_PEPPER | (auto) | HMAC pepper for API keys |
 
 ### TLS Flags
 
@@ -196,4 +195,3 @@ sudo setcap cap_net_bind_service=+ep ./oastrix
 
 - API keys are shown only once at creation - store securely
 - The database contains captured request data and TLS private keys - secure file permissions (0600)
-- Use `--pepper` or `OASTRIX_PEPPER` for consistent API key hashing across restarts

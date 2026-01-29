@@ -31,7 +31,6 @@ func getAPIKeyID(r *http.Request) int64 {
 type APIServer struct {
 	DB       *sql.DB
 	Domain   string
-	Pepper   []byte
 	Logger   *zap.Logger
 	PublicIP string
 }
@@ -68,7 +67,7 @@ func (s *APIServer) AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if !auth.VerifyAPIKey(apiKey, storedKey.KeyHash, s.Pepper) {
+		if !auth.VerifyAPIKey(apiKey, storedKey.KeyHash) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
