@@ -1,3 +1,4 @@
+// Package token provides OAST token generation.
 package token
 
 import (

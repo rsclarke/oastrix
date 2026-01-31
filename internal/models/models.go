@@ -1,3 +1,4 @@
+// Package models defines the database entity types.
 package models
 
 type APIKey struct {

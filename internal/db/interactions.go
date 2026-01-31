@@ -7,12 +7,12 @@ import (
 	"github.com/rsclarke/oastrix/internal/models"
 )
 
-func CreateInteraction(db *sql.DB, tokenID int64, kind string, remoteIP string, remotePort int, tls bool, summary string) (int64, error) {
+func CreateInteraction(d *sql.DB, tokenID int64, kind string, remoteIP string, remotePort int, tls bool, summary string) (int64, error) {
 	tlsVal := 0
 	if tls {
 		tlsVal = 1
 	}
-	result, err := db.Exec(
+	result, err := d.Exec(
 		"INSERT INTO interactions (token_id, kind, occurred_at, remote_ip, remote_port, tls, summary) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		tokenID, kind, time.Now().Unix(), remoteIP, remotePort, tlsVal, summary,
 	)
@@ -22,16 +22,16 @@ func CreateInteraction(db *sql.DB, tokenID int64, kind string, remoteIP string, 
 	return result.LastInsertId()
 }
 
-func CreateHTTPInteraction(db *sql.DB, interactionID int64, method, scheme, host, path, query, httpVersion string, headers string, body []byte) error {
-	_, err := db.Exec(
+func CreateHTTPInteraction(d *sql.DB, interactionID int64, method, scheme, host, path, query, httpVersion string, headers string, body []byte) error {
+	_, err := d.Exec(
 		"INSERT INTO http_interactions (interaction_id, method, scheme, host, path, query, http_version, request_headers, request_body) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		interactionID, method, scheme, host, path, query, httpVersion, headers, body,
 	)
 	return err
 }
 
-func GetInteractionsByToken(db *sql.DB, tokenID int64) ([]models.Interaction, error) {
-	rows, err := db.Query(
+func GetInteractionsByToken(d *sql.DB, tokenID int64) ([]models.Interaction, error) {
+	rows, err := d.Query(
 		"SELECT id, token_id, kind, occurred_at, remote_ip, remote_port, tls, summary FROM interactions WHERE token_id = ? ORDER BY occurred_at DESC",
 		tokenID,
 	)
@@ -54,8 +54,8 @@ func GetInteractionsByToken(db *sql.DB, tokenID int64) ([]models.Interaction, er
 	return interactions, rows.Err()
 }
 
-func GetHTTPInteraction(db *sql.DB, interactionID int64) (*models.HTTPInteraction, error) {
-	row := db.QueryRow(
+func GetHTTPInteraction(d *sql.DB, interactionID int64) (*models.HTTPInteraction, error) {
+	row := d.QueryRow(
 		"SELECT interaction_id, method, scheme, host, path, query, http_version, request_headers, request_body FROM http_interactions WHERE interaction_id = ?",
 		interactionID,
 	)
@@ -70,26 +70,26 @@ func GetHTTPInteraction(db *sql.DB, interactionID int64) (*models.HTTPInteractio
 	return &h, nil
 }
 
-func CreateDNSInteraction(db *sql.DB, interactionID int64, qname string, qtype, qclass, rd, opcode, dnsID int, protocol string) error {
-	_, err := db.Exec(
+func CreateDNSInteraction(d *sql.DB, interactionID int64, qname string, qtype, qclass, rd, opcode, dnsID int, protocol string) error {
+	_, err := d.Exec(
 		"INSERT INTO dns_interactions (interaction_id, qname, qtype, qclass, rd, opcode, dns_id, protocol) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 		interactionID, qname, qtype, qclass, rd, opcode, dnsID, protocol,
 	)
 	return err
 }
 
-func GetDNSInteraction(db *sql.DB, interactionID int64) (*models.DNSInteraction, error) {
-	row := db.QueryRow(
+func GetDNSInteraction(d *sql.DB, interactionID int64) (*models.DNSInteraction, error) {
+	row := d.QueryRow(
 		"SELECT interaction_id, qname, qtype, qclass, rd, opcode, dns_id, protocol FROM dns_interactions WHERE interaction_id = ?",
 		interactionID,
 	)
-	var d models.DNSInteraction
-	err := row.Scan(&d.InteractionID, &d.QName, &d.QType, &d.QClass, &d.RD, &d.Opcode, &d.DNSID, &d.Protocol)
+	var dns models.DNSInteraction
+	err := row.Scan(&dns.InteractionID, &dns.QName, &dns.QType, &dns.QClass, &dns.RD, &dns.Opcode, &dns.DNSID, &dns.Protocol)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	return &d, nil
+	return &dns, nil
 }

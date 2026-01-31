@@ -1,3 +1,4 @@
+// Package auth provides API key generation and verification.
 package auth
 
 import (

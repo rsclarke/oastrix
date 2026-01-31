@@ -1,3 +1,4 @@
+// Package api defines the API request and response types.
 package api
 
 type CreateTokenRequest struct {
