@@ -1,8 +1,10 @@
+// Package client provides an HTTP client for the oastrix API.
 package client
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -154,5 +156,5 @@ func parseError(resp *http.Response) error {
 	if err := json.Unmarshal(body, &errResp); err != nil || errResp.Error == "" {
 		return fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
 	}
-	return fmt.Errorf("%s", errResp.Error)
+	return errors.New(errResp.Error)
 }

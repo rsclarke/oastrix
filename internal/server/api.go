@@ -1,3 +1,4 @@
+// Package server implements the HTTP, HTTPS, DNS, and API servers.
 package server
 
 import (
@@ -75,7 +76,6 @@ func (s *APIServer) AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Add API key ID to context for ownership checks
 		ctx := context.WithValue(r.Context(), apiKeyIDContextKey, storedKey.ID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

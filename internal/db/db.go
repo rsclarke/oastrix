@@ -1,3 +1,4 @@
+// Package db provides database access and migrations.
 package db
 
 import (
@@ -113,8 +114,8 @@ type TokenWithCount struct {
 	InteractionCount int
 }
 
-func ListTokensByAPIKey(db *sql.DB, apiKeyID int64) ([]TokenWithCount, error) {
-	rows, err := db.Query(`
+func ListTokensByAPIKey(d *sql.DB, apiKeyID int64) ([]TokenWithCount, error) {
+	rows, err := d.Query(`
 		SELECT t.token, t.label, t.created_at, COUNT(i.id) as interaction_count
 		FROM tokens t
 		LEFT JOIN interactions i ON i.token_id = t.id

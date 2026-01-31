@@ -1,3 +1,4 @@
+// Package acme handles automatic TLS certificate management via ACME.
 package acme
 
 import (
