@@ -127,8 +127,8 @@ func TestHTTPServer_StoresInteraction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open db: %v", err)
 	}
-	defer database.Close()
-	defer os.Remove(tmpDB)
+	defer func() { _ = database.Close() }()
+	defer func() { _ = os.Remove(tmpDB) }()
 
 	tokenValue := "testtoken123"
 	_, err = db.CreateToken(database, tokenValue, nil, nil)
@@ -191,8 +191,8 @@ func TestHTTPServer_UnknownTokenDoesNotError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open db: %v", err)
 	}
-	defer database.Close()
-	defer os.Remove(tmpDB)
+	defer func() { _ = database.Close() }()
+	defer func() { _ = os.Remove(tmpDB) }()
 
 	srv := &HTTPServer{
 		DB:     database,
@@ -227,7 +227,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 		t.Fatalf("failed to open db: %v", err)
 	}
 	t.Cleanup(func() {
-		database.Close()
+		_ = database.Close()
 	})
 	return database
 }
