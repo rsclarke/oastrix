@@ -21,9 +21,3 @@ make build    # build binary
 make test     # run tests
 make lint     # run golangci-lint (enforces style rules)
 ```
-
-## Workflow
-
-- Run `make lint` before committing
-- All linter errors must be resolved
-- Use table-driven tests; fixtures in `testdata/`
