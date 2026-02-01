@@ -70,7 +70,7 @@ func (c *Client) CreateToken(ctx context.Context, label string) (*types.CreateTo
 	if err != nil {
 		return nil, fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseError(resp)
@@ -95,7 +95,7 @@ func (c *Client) GetInteractions(ctx context.Context, token string) (*types.GetI
 	if err != nil {
 		return nil, fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseError(resp)
@@ -120,7 +120,7 @@ func (c *Client) ListTokens(ctx context.Context) (*types.ListTokensResponse, err
 	if err != nil {
 		return nil, fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, parseError(resp)
@@ -145,7 +145,7 @@ func (c *Client) DeleteToken(ctx context.Context, token string) error {
 	if err != nil {
 		return fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return parseError(resp)
