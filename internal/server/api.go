@@ -223,9 +223,18 @@ func (s *APIServer) handleGetInteractions(w http.ResponseWriter, r *http.Request
 
 		if i.Kind == "http" {
 			httpInt, err := db.GetHTTPInteraction(s.DB, i.ID)
-			if err == nil && httpInt != nil {
+			if err != nil {
+				s.Logger.Error("failed to get HTTP interaction details",
+					zap.Int64("interaction_id", i.ID),
+					zap.Error(err))
+			} else if httpInt != nil {
 				var headers map[string][]string
-				json.Unmarshal([]byte(httpInt.RequestHeaders), &headers)
+				if err := json.Unmarshal([]byte(httpInt.RequestHeaders), &headers); err != nil {
+					s.Logger.Warn("failed to parse stored request headers",
+						zap.Int64("interaction_id", i.ID),
+						zap.Error(err))
+					headers = make(map[string][]string)
+				}
 
 				ir.HTTP = &api.HTTPInteractionDetail{
 					Method:  httpInt.Method,
@@ -241,7 +250,11 @@ func (s *APIServer) handleGetInteractions(w http.ResponseWriter, r *http.Request
 
 		if i.Kind == "dns" {
 			dnsInt, err := db.GetDNSInteraction(s.DB, i.ID)
-			if err == nil && dnsInt != nil {
+			if err != nil {
+				s.Logger.Error("failed to get DNS interaction details",
+					zap.Int64("interaction_id", i.ID),
+					zap.Error(err))
+			} else if dnsInt != nil {
 				ir.DNS = &api.DNSInteractionDetail{
 					QName:    dnsInt.QName,
 					QType:    dnsInt.QType,
