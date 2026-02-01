@@ -102,10 +102,14 @@ func applyMigrations(db *sql.DB) error {
 
 func parseVersion(filename string) (int, error) {
 	parts := strings.SplitN(filename, "_", 2)
-	if len(parts) == 0 {
+	if len(parts) < 2 || parts[0] == "" {
 		return 0, fmt.Errorf("invalid migration filename: %s", filename)
 	}
-	return strconv.Atoi(parts[0])
+	version, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, fmt.Errorf("parse version number from %q: %w", filename, err)
+	}
+	return version, nil
 }
 
 // TokenWithCount represents a token along with its interaction count.
