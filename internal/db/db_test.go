@@ -101,3 +101,32 @@ func TestCascadeDelete(t *testing.T) {
 		t.Errorf("expected 0 interactions after cascade delete, got %d", count)
 	}
 }
+
+func TestParseVersion(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		want     int
+		wantErr  bool
+	}{
+		{"valid", "001_create_tables.sql", 1, false},
+		{"valid large", "123_add_column.sql", 123, false},
+		{"missing underscore", "001.sql", 0, true},
+		{"empty prefix", "_create_tables.sql", 0, true},
+		{"non-numeric prefix", "abc_create_tables.sql", 0, true},
+		{"empty string", "", 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseVersion(tt.filename)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseVersion(%q) error = %v, wantErr %v", tt.filename, err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("parseVersion(%q) = %v, want %v", tt.filename, got, tt.want)
+			}
+		})
+	}
+}
