@@ -221,7 +221,7 @@ func (s *DNSServer) handleDNS(w dns.ResponseWriter, r *dns.Msg) {
 		}
 	}
 
-	w.WriteMsg(m)
+	_ = w.WriteMsg(m)
 }
 
 func extractTokenFromQName(qname, domain string) string {
