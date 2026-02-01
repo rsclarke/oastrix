@@ -56,19 +56,19 @@ func (c *Client) CreateToken(ctx context.Context, label string) (*api.CreateToke
 	reqBody := api.CreateTokenRequest{Label: label}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", c.BaseURL+"/v1/tokens", bytes.NewReader(body))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -78,7 +78,7 @@ func (c *Client) CreateToken(ctx context.Context, label string) (*api.CreateToke
 
 	var result api.CreateTokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return &result, nil
 }
@@ -87,13 +87,13 @@ func (c *Client) CreateToken(ctx context.Context, label string) (*api.CreateToke
 func (c *Client) GetInteractions(ctx context.Context, token string) (*api.GetInteractionsResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", c.BaseURL+"/v1/tokens/"+token+"/interactions", nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -103,7 +103,7 @@ func (c *Client) GetInteractions(ctx context.Context, token string) (*api.GetInt
 
 	var result api.GetInteractionsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return &result, nil
 }
@@ -112,13 +112,13 @@ func (c *Client) GetInteractions(ctx context.Context, token string) (*api.GetInt
 func (c *Client) ListTokens(ctx context.Context) (*api.ListTokensResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", c.BaseURL+"/v1/tokens", nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -128,7 +128,7 @@ func (c *Client) ListTokens(ctx context.Context) (*api.ListTokensResponse, error
 
 	var result api.ListTokensResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return &result, nil
 }
@@ -137,13 +137,13 @@ func (c *Client) ListTokens(ctx context.Context) (*api.ListTokensResponse, error
 func (c *Client) DeleteToken(ctx context.Context, token string) error {
 	req, err := http.NewRequestWithContext(ctx, "DELETE", c.BaseURL+"/v1/tokens/"+token, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -157,7 +157,7 @@ func (c *Client) DeleteToken(ctx context.Context, token string) error {
 func parseError(resp *http.Response) error {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("request failed with status %d", resp.StatusCode)
+		return fmt.Errorf("read error response (status %d): %w", resp.StatusCode, err)
 	}
 
 	var errResp api.ErrorResponse
