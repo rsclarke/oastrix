@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rsclarke/oastrix/internal/api"
+	"github.com/rsclarke/oastrix/internal/types"
 )
 
 // HTTPClient is an interface for HTTP clients that can execute requests.
@@ -52,8 +52,8 @@ func WithHTTPClient(httpClient HTTPClient) Option {
 }
 
 // CreateToken creates a new token with the given label.
-func (c *Client) CreateToken(ctx context.Context, label string) (*api.CreateTokenResponse, error) {
-	reqBody := api.CreateTokenRequest{Label: label}
+func (c *Client) CreateToken(ctx context.Context, label string) (*types.CreateTokenResponse, error) {
+	reqBody := types.CreateTokenRequest{Label: label}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
@@ -76,7 +76,7 @@ func (c *Client) CreateToken(ctx context.Context, label string) (*api.CreateToke
 		return nil, parseError(resp)
 	}
 
-	var result api.CreateTokenResponse
+	var result types.CreateTokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
@@ -84,7 +84,7 @@ func (c *Client) CreateToken(ctx context.Context, label string) (*api.CreateToke
 }
 
 // GetInteractions retrieves all interactions for the specified token.
-func (c *Client) GetInteractions(ctx context.Context, token string) (*api.GetInteractionsResponse, error) {
+func (c *Client) GetInteractions(ctx context.Context, token string) (*types.GetInteractionsResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", c.BaseURL+"/v1/tokens/"+token+"/interactions", nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
@@ -101,7 +101,7 @@ func (c *Client) GetInteractions(ctx context.Context, token string) (*api.GetInt
 		return nil, parseError(resp)
 	}
 
-	var result api.GetInteractionsResponse
+	var result types.GetInteractionsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
@@ -109,7 +109,7 @@ func (c *Client) GetInteractions(ctx context.Context, token string) (*api.GetInt
 }
 
 // ListTokens retrieves all tokens associated with the API key.
-func (c *Client) ListTokens(ctx context.Context) (*api.ListTokensResponse, error) {
+func (c *Client) ListTokens(ctx context.Context) (*types.ListTokensResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", c.BaseURL+"/v1/tokens", nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
@@ -126,7 +126,7 @@ func (c *Client) ListTokens(ctx context.Context) (*api.ListTokensResponse, error
 		return nil, parseError(resp)
 	}
 
-	var result api.ListTokensResponse
+	var result types.ListTokensResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
@@ -160,7 +160,7 @@ func parseError(resp *http.Response) error {
 		return fmt.Errorf("read error response (status %d): %w", resp.StatusCode, err)
 	}
 
-	var errResp api.ErrorResponse
+	var errResp types.ErrorResponse
 	if err := json.Unmarshal(body, &errResp); err != nil || errResp.Error == "" {
 		return fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
 	}

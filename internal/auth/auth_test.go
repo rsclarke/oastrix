@@ -34,7 +34,7 @@ func TestGenerateAPIKey(t *testing.T) {
 	}
 	// Verify secret contains only alphanumeric characters (no _ or -)
 	for _, c := range secret {
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') {
 			t.Errorf("secret contains invalid character: %c", c)
 		}
 	}

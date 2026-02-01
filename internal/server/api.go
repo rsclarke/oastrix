@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rsclarke/oastrix/internal/api"
+	"github.com/rsclarke/oastrix/internal/types"
 	"github.com/rsclarke/oastrix/internal/auth"
 	"github.com/rsclarke/oastrix/internal/db"
 	"github.com/rsclarke/oastrix/internal/token"
@@ -102,11 +102,11 @@ func (s *APIServer) handleListTokens(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := api.ListTokensResponse{
-		Tokens: make([]api.TokenInfo, 0, len(tokens)),
+	resp := types.ListTokensResponse{
+		Tokens: make([]types.TokenInfo, 0, len(tokens)),
 	}
 	for _, t := range tokens {
-		resp.Tokens = append(resp.Tokens, api.TokenInfo{
+		resp.Tokens = append(resp.Tokens, types.TokenInfo{
 			Token:            t.Token,
 			Label:            t.Label,
 			CreatedAt:        time.Unix(t.CreatedAt, 0).UTC().Format(time.RFC3339),
@@ -118,7 +118,7 @@ func (s *APIServer) handleListTokens(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *APIServer) handleCreateToken(w http.ResponseWriter, r *http.Request) {
-	var req api.CreateTokenRequest
+	var req types.CreateTokenRequest
 	if r.Body != nil {
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<16) // 64KB limit
 		dec := json.NewDecoder(r.Body)
@@ -158,7 +158,7 @@ func (s *APIServer) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := api.CreateTokenResponse{
+	resp := types.CreateTokenResponse{
 		Token: tok,
 		Payloads: map[string]string{
 			"dns":   fmt.Sprintf("%s.%s", tok, s.Domain),
@@ -205,13 +205,13 @@ func (s *APIServer) handleGetInteractions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	resp := api.GetInteractionsResponse{
+	resp := types.GetInteractionsResponse{
 		Token:        tokenValue,
-		Interactions: make([]api.InteractionResponse, 0, len(interactions)),
+		Interactions: make([]types.InteractionResponse, 0, len(interactions)),
 	}
 
 	for _, i := range interactions {
-		ir := api.InteractionResponse{
+		ir := types.InteractionResponse{
 			ID:         i.ID,
 			Kind:       i.Kind,
 			OccurredAt: time.Unix(i.OccurredAt, 0).UTC().Format(time.RFC3339),
@@ -236,7 +236,7 @@ func (s *APIServer) handleGetInteractions(w http.ResponseWriter, r *http.Request
 					headers = make(map[string][]string)
 				}
 
-				ir.HTTP = &api.HTTPInteractionDetail{
+				ir.HTTP = &types.HTTPInteractionDetail{
 					Method:  httpInt.Method,
 					Scheme:  httpInt.Scheme,
 					Host:    httpInt.Host,
@@ -255,7 +255,7 @@ func (s *APIServer) handleGetInteractions(w http.ResponseWriter, r *http.Request
 					zap.Int64("interaction_id", i.ID),
 					zap.Error(err))
 			} else if dnsInt != nil {
-				ir.DNS = &api.DNSInteractionDetail{
+				ir.DNS = &types.DNSInteractionDetail{
 					QName:    dnsInt.QName,
 					QType:    dnsInt.QType,
 					QClass:   dnsInt.QClass,
@@ -303,7 +303,7 @@ func (s *APIServer) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, api.DeleteTokenResponse{Deleted: true})
+	writeJSON(w, http.StatusOK, types.DeleteTokenResponse{Deleted: true})
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

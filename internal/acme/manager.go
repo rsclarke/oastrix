@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// Manager handles automatic certificate acquisition and renewal via ACME
+// Manager handles automatic certificate acquisition and renewal via ACME.
 type Manager struct {
 	Domain   string
 	Email    string
@@ -41,7 +41,7 @@ func SetLogger(logger *zap.Logger) {
 	certmagic.DefaultACME.Logger = logger
 }
 
-// NewManager creates a new ACME manager
+// NewManager creates a new ACME manager.
 func NewManager(domain, email string, db *sql.DB, staging bool, store *TXTStore, publicIP string, logger *zap.Logger) *Manager {
 	if logger == nil {
 		logger = zap.NewNop()
@@ -62,7 +62,7 @@ func NewManager(domain, email string, db *sql.DB, staging bool, store *TXTStore,
 	}
 }
 
-// newBaseConfig creates a new certmagic config with common settings
+// newBaseConfig creates a new certmagic config with common settings.
 func (m *Manager) newBaseConfig() *certmagic.Config {
 	certmagic.Default.Logger = m.Logger
 	certmagic.DefaultACME.Logger = m.Logger
@@ -72,8 +72,8 @@ func (m *Manager) newBaseConfig() *certmagic.Config {
 	return cfg
 }
 
-// Manage obtains and manages certificates for the domain and wildcard
-// This should be called after the DNS server is started
+// Manage obtains and manages certificates for the domain and wildcard.
+// This should be called after the DNS server is started.
 func (m *Manager) Manage(ctx context.Context) error {
 	// Create SQLite storage for certificates using the shared database
 	hostname, _ := os.Hostname()
@@ -169,7 +169,7 @@ func (m *Manager) Manage(ctx context.Context) error {
 	return nil
 }
 
-// TLSConfig returns a TLS configuration that uses the managed certificates
+// TLSConfig returns a TLS configuration that uses the managed certificates.
 func (m *Manager) TLSConfig() *tls.Config {
 	if m.dnsConfig == nil {
 		return nil

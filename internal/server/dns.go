@@ -207,7 +207,7 @@ func (s *DNSServer) handleDNS(w dns.ResponseWriter, r *dns.Msg) {
 			continue
 		}
 
-		err = db.CreateDNSInteraction(s.DB, interactionID, qname, int(q.Qtype), int(q.Qclass), rd, int(r.Opcode), int(r.Id), protocol)
+		err = db.CreateDNSInteraction(s.DB, interactionID, qname, int(q.Qtype), int(q.Qclass), rd, r.Opcode, int(r.Id), protocol)
 		if err != nil {
 			s.Logger.Error("create dns interaction details failed", zap.Error(err))
 		}
