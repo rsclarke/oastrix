@@ -17,6 +17,7 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
+// Open opens a SQLite database at the given path and applies pending migrations.
 func Open(dbPath string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
@@ -107,6 +108,7 @@ func parseVersion(filename string) (int, error) {
 	return strconv.Atoi(parts[0])
 }
 
+// TokenWithCount represents a token along with its interaction count.
 type TokenWithCount struct {
 	Token            string
 	Label            *string
@@ -114,6 +116,7 @@ type TokenWithCount struct {
 	InteractionCount int
 }
 
+// ListTokensByAPIKey retrieves all tokens for an API key with their interaction counts.
 func ListTokensByAPIKey(d *sql.DB, apiKeyID int64) ([]TokenWithCount, error) {
 	rows, err := d.Query(`
 		SELECT t.token, t.label, t.created_at, COUNT(i.id) as interaction_count

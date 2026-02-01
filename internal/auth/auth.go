@@ -16,8 +16,11 @@ const (
 	secretBytes   = 32
 )
 
+// ErrInvalidKeyFormat is returned when an API key does not match the expected format.
 var ErrInvalidKeyFormat = errors.New("invalid API key format")
 
+// GenerateAPIKey creates a new API key and returns the display key, prefix, and hash.
+// The display key format is: oastrix_<prefix>_<secret>.
 func GenerateAPIKey() (displayKey string, prefix string, hash []byte, err error) {
 	prefixBytes := make([]byte, prefixLength)
 	if _, err := rand.Read(prefixBytes); err != nil {
@@ -40,11 +43,13 @@ func GenerateAPIKey() (displayKey string, prefix string, hash []byte, err error)
 	return displayKey, prefix, hash, nil
 }
 
+// HashSecret computes the SHA-256 hash of an API key secret.
 func HashSecret(secret string) []byte {
 	h := sha256.Sum256([]byte(secret))
 	return h[:]
 }
 
+// VerifyAPIKey validates an API key by comparing its secret hash against a stored hash.
 func VerifyAPIKey(displayKey string, storedHash []byte) bool {
 	prefix, secret, err := ParseAPIKey(displayKey)
 	if err != nil || prefix == "" {
@@ -54,6 +59,7 @@ func VerifyAPIKey(displayKey string, storedHash []byte) bool {
 	return subtle.ConstantTimeCompare(computedHash, storedHash) == 1
 }
 
+// ParseAPIKey extracts the prefix and secret from a display key.
 func ParseAPIKey(displayKey string) (prefix string, secret string, err error) {
 	// Format: oastrix_<prefix>_<secret>
 	if !strings.HasPrefix(displayKey, servicePrefix+"_") {
