@@ -306,7 +306,7 @@ func (s *APIServer) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, api.DeleteTokenResponse{Deleted: true})
 }
 
-func writeJSON(w http.ResponseWriter, status int, data interface{}) {
+func writeJSON(w http.ResponseWriter, status int, data any) {
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(data); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
