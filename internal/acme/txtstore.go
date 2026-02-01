@@ -5,17 +5,20 @@ import (
 	"sync"
 )
 
+// TXTStore is a thread-safe store for DNS TXT records used in ACME challenges.
 type TXTStore struct {
 	mu      sync.RWMutex
 	records map[string]map[string]struct{}
 }
 
+// NewTXTStore creates a new empty TXT record store.
 func NewTXTStore() *TXTStore {
 	return &TXTStore{
 		records: make(map[string]map[string]struct{}),
 	}
 }
 
+// Add inserts a TXT record value for the given FQDN.
 func (s *TXTStore) Add(fqdn, value string) {
 	fqdn = NormalizeName(fqdn)
 	s.mu.Lock()
@@ -26,6 +29,7 @@ func (s *TXTStore) Add(fqdn, value string) {
 	s.records[fqdn][value] = struct{}{}
 }
 
+// Remove deletes a TXT record value for the given FQDN.
 func (s *TXTStore) Remove(fqdn, value string) {
 	fqdn = NormalizeName(fqdn)
 	s.mu.Lock()
@@ -39,6 +43,7 @@ func (s *TXTStore) Remove(fqdn, value string) {
 	}
 }
 
+// Get returns all TXT record values for the given FQDN.
 func (s *TXTStore) Get(fqdn string) []string {
 	fqdn = NormalizeName(fqdn)
 	s.mu.RLock()
@@ -54,6 +59,7 @@ func (s *TXTStore) Get(fqdn string) []string {
 	return result
 }
 
+// NormalizeName lowercases and removes trailing dots from a DNS name.
 func NormalizeName(name string) string {
 	name = strings.ToLower(name)
 	name = strings.TrimSuffix(name, ".")

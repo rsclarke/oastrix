@@ -7,13 +7,17 @@ import (
 	"github.com/libdns/libdns"
 )
 
-var _ libdns.RecordAppender = (*Provider)(nil)
-var _ libdns.RecordDeleter = (*Provider)(nil)
+var (
+	_ libdns.RecordAppender = (*Provider)(nil)
+	_ libdns.RecordDeleter  = (*Provider)(nil)
+)
 
+// Provider implements libdns interfaces for ACME DNS-01 challenges.
 type Provider struct {
 	Store *TXTStore
 }
 
+// AppendRecords adds TXT records to the store for ACME challenges.
 func (p *Provider) AppendRecords(ctx context.Context, zone string, recs []libdns.Record) ([]libdns.Record, error) {
 	for _, r := range recs {
 		rr := r.RR()
@@ -25,6 +29,7 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, recs []libdns
 	return recs, nil
 }
 
+// DeleteRecords removes TXT records from the store after ACME validation.
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, recs []libdns.Record) ([]libdns.Record, error) {
 	for _, r := range recs {
 		rr := r.RR()

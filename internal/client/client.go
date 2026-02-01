@@ -13,16 +13,19 @@ import (
 	"github.com/rsclarke/oastrix/internal/api"
 )
 
+// HTTPClient is an interface for HTTP clients that can execute requests.
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// Client is an HTTP client for interacting with the oastrix API.
 type Client struct {
 	BaseURL    string
 	APIKey     string
 	httpClient HTTPClient
 }
 
+// NewClient creates a new API client with the given base URL and API key.
 func NewClient(baseURL, apiKey string, opts ...Option) *Client {
 	c := &Client{
 		BaseURL: baseURL,
@@ -37,16 +40,17 @@ func NewClient(baseURL, apiKey string, opts ...Option) *Client {
 	return c
 }
 
+// Option is a functional option for configuring the client.
 type Option func(*Client)
 
+// WithHTTPClient sets a custom HTTP client for the API client.
 func WithHTTPClient(httpClient HTTPClient) Option {
 	return func(c *Client) {
 		c.httpClient = httpClient
 	}
 }
 
-
-
+// CreateToken creates a new token with the given label.
 func (c *Client) CreateToken(label string) (*api.CreateTokenResponse, error) {
 	reqBody := api.CreateTokenRequest{Label: label}
 	body, err := json.Marshal(reqBody)
@@ -78,6 +82,7 @@ func (c *Client) CreateToken(label string) (*api.CreateTokenResponse, error) {
 	return &result, nil
 }
 
+// GetInteractions retrieves all interactions for the specified token.
 func (c *Client) GetInteractions(token string) (*api.GetInteractionsResponse, error) {
 	req, err := http.NewRequest("GET", c.BaseURL+"/v1/tokens/"+token+"/interactions", nil)
 	if err != nil {
@@ -102,6 +107,7 @@ func (c *Client) GetInteractions(token string) (*api.GetInteractionsResponse, er
 	return &result, nil
 }
 
+// ListTokens retrieves all tokens associated with the API key.
 func (c *Client) ListTokens() (*api.ListTokensResponse, error) {
 	req, err := http.NewRequest("GET", c.BaseURL+"/v1/tokens", nil)
 	if err != nil {
@@ -126,6 +132,7 @@ func (c *Client) ListTokens() (*api.ListTokensResponse, error) {
 	return &result, nil
 }
 
+// DeleteToken removes the specified token.
 func (c *Client) DeleteToken(token string) error {
 	req, err := http.NewRequest("DELETE", c.BaseURL+"/v1/tokens/"+token, nil)
 	if err != nil {

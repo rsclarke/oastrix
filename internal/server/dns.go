@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// DNSServer handles DNS queries and records interactions.
 type DNSServer struct {
 	DB        *sql.DB
 	Domain    string
@@ -25,6 +26,7 @@ type DNSServer struct {
 	tcpServer *dns.Server
 }
 
+// Start begins listening for DNS queries on the specified UDP and TCP ports.
 func (s *DNSServer) Start(udpPort, tcpPort int) error {
 	handler := dns.HandlerFunc(s.handleDNS)
 
@@ -78,6 +80,7 @@ func (s *DNSServer) Start(udpPort, tcpPort int) error {
 	return nil
 }
 
+// Shutdown gracefully stops the DNS servers.
 func (s *DNSServer) Shutdown(ctx context.Context) {
 	if s.udpServer != nil {
 		if err := s.udpServer.ShutdownContext(ctx); err != nil {

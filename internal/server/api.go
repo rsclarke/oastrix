@@ -32,6 +32,7 @@ func getAPIKeyID(r *http.Request) int64 {
 	return 0
 }
 
+// APIServer handles the REST API for token and interaction management.
 type APIServer struct {
 	DB       *sql.DB
 	Domain   string
@@ -39,6 +40,7 @@ type APIServer struct {
 	PublicIP string
 }
 
+// AuthMiddleware validates API key authentication for protected routes.
 func (s *APIServer) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
@@ -81,6 +83,7 @@ func (s *APIServer) AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// Handler returns the HTTP handler for the API server.
 func (s *APIServer) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/tokens", s.handleCreateToken)
@@ -90,8 +93,6 @@ func (s *APIServer) Handler() http.Handler {
 
 	return s.AuthMiddleware(mux)
 }
-
-
 
 func (s *APIServer) handleListTokens(w http.ResponseWriter, r *http.Request) {
 	apiKeyID := getAPIKeyID(r)
@@ -173,8 +174,6 @@ func (s *APIServer) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, resp)
 }
-
-
 
 func (s *APIServer) handleGetInteractions(w http.ResponseWriter, r *http.Request) {
 	tokenValue := r.PathValue("token")

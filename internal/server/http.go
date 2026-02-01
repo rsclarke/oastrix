@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// HTTPServer handles HTTP requests and records interactions.
 type HTTPServer struct {
 	DB       *sql.DB
 	Domain   string
@@ -23,6 +24,7 @@ type HTTPServer struct {
 	Logger   *zap.Logger
 }
 
+// ExtractToken extracts an OAST token from the request host or path.
 func ExtractToken(r *http.Request, domain string) string {
 	host := r.Host
 	if h, _, err := net.SplitHostPort(host); err == nil {

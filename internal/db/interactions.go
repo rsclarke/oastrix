@@ -7,6 +7,7 @@ import (
 	"github.com/rsclarke/oastrix/internal/models"
 )
 
+// CreateInteraction inserts a new interaction record and returns its ID.
 func CreateInteraction(d *sql.DB, tokenID int64, kind string, remoteIP string, remotePort int, tls bool, summary string) (int64, error) {
 	tlsVal := 0
 	if tls {
@@ -22,6 +23,7 @@ func CreateInteraction(d *sql.DB, tokenID int64, kind string, remoteIP string, r
 	return result.LastInsertId()
 }
 
+// CreateHTTPInteraction inserts HTTP-specific details for an interaction.
 func CreateHTTPInteraction(d *sql.DB, interactionID int64, method, scheme, host, path, query, httpVersion string, headers string, body []byte) error {
 	_, err := d.Exec(
 		"INSERT INTO http_interactions (interaction_id, method, scheme, host, path, query, http_version, request_headers, request_body) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -30,6 +32,7 @@ func CreateHTTPInteraction(d *sql.DB, interactionID int64, method, scheme, host,
 	return err
 }
 
+// GetInteractionsByToken retrieves all interactions for a given token ID.
 func GetInteractionsByToken(d *sql.DB, tokenID int64) ([]models.Interaction, error) {
 	rows, err := d.Query(
 		"SELECT id, token_id, kind, occurred_at, remote_ip, remote_port, tls, summary FROM interactions WHERE token_id = ? ORDER BY occurred_at DESC",
@@ -54,6 +57,7 @@ func GetInteractionsByToken(d *sql.DB, tokenID int64) ([]models.Interaction, err
 	return interactions, rows.Err()
 }
 
+// GetHTTPInteraction retrieves HTTP-specific details for an interaction.
 func GetHTTPInteraction(d *sql.DB, interactionID int64) (*models.HTTPInteraction, error) {
 	row := d.QueryRow(
 		"SELECT interaction_id, method, scheme, host, path, query, http_version, request_headers, request_body FROM http_interactions WHERE interaction_id = ?",
@@ -70,6 +74,7 @@ func GetHTTPInteraction(d *sql.DB, interactionID int64) (*models.HTTPInteraction
 	return &h, nil
 }
 
+// CreateDNSInteraction inserts DNS-specific details for an interaction.
 func CreateDNSInteraction(d *sql.DB, interactionID int64, qname string, qtype, qclass, rd, opcode, dnsID int, protocol string) error {
 	_, err := d.Exec(
 		"INSERT INTO dns_interactions (interaction_id, qname, qtype, qclass, rd, opcode, dns_id, protocol) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -78,6 +83,7 @@ func CreateDNSInteraction(d *sql.DB, interactionID int64, qname string, qtype, q
 	return err
 }
 
+// GetDNSInteraction retrieves DNS-specific details for an interaction.
 func GetDNSInteraction(d *sql.DB, interactionID int64) (*models.DNSInteraction, error) {
 	row := d.QueryRow(
 		"SELECT interaction_id, qname, qtype, qclass, rd, opcode, dns_id, protocol FROM dns_interactions WHERE interaction_id = ?",

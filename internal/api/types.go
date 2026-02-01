@@ -1,15 +1,18 @@
 // Package api defines the API request and response types.
 package api
 
+// CreateTokenRequest is the request body for creating a new token.
 type CreateTokenRequest struct {
 	Label string `json:"label,omitempty"`
 }
 
+// CreateTokenResponse is the response body for token creation.
 type CreateTokenResponse struct {
 	Token    string            `json:"token"`
 	Payloads map[string]string `json:"payloads"`
 }
 
+// TokenInfo represents a token with its metadata.
 type TokenInfo struct {
 	Token            string  `json:"token"`
 	Label            *string `json:"label"`
@@ -17,10 +20,12 @@ type TokenInfo struct {
 	InteractionCount int     `json:"interaction_count"`
 }
 
+// ListTokensResponse is the response body for listing tokens.
 type ListTokensResponse struct {
 	Tokens []TokenInfo `json:"tokens"`
 }
 
+// InteractionResponse represents a single recorded interaction.
 type InteractionResponse struct {
 	ID         int64                  `json:"id"`
 	Kind       string                 `json:"kind"`
@@ -33,6 +38,7 @@ type InteractionResponse struct {
 	DNS        *DNSInteractionDetail  `json:"dns,omitempty"`
 }
 
+// HTTPInteractionDetail contains HTTP-specific interaction details.
 type HTTPInteractionDetail struct {
 	Method  string              `json:"method"`
 	Scheme  string              `json:"scheme"`
@@ -43,6 +49,7 @@ type HTTPInteractionDetail struct {
 	Body    string              `json:"body"`
 }
 
+// DNSInteractionDetail contains DNS-specific interaction details.
 type DNSInteractionDetail struct {
 	QName    string `json:"qname"`
 	QType    int    `json:"qtype"`
@@ -53,15 +60,18 @@ type DNSInteractionDetail struct {
 	Protocol string `json:"protocol"`
 }
 
+// GetInteractionsResponse is the response body for retrieving interactions.
 type GetInteractionsResponse struct {
 	Token        string                `json:"token"`
 	Interactions []InteractionResponse `json:"interactions"`
 }
 
+// DeleteTokenResponse is the response body for token deletion.
 type DeleteTokenResponse struct {
 	Deleted bool `json:"deleted"`
 }
 
+// ErrorResponse represents an API error response.
 type ErrorResponse struct {
 	Error string `json:"error"`
 }
