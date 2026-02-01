@@ -11,8 +11,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// ServerConfig holds configuration for an HTTP server.
-type ServerConfig struct {
+// Config holds configuration for an HTTP server.
+type Config struct {
 	Addr              string
 	Handler           http.Handler
 	TLSConfig         *tls.Config
@@ -22,9 +22,9 @@ type ServerConfig struct {
 	WriteTimeout      time.Duration
 }
 
-// DefaultServerConfig returns a ServerConfig with sensible defaults.
-func DefaultServerConfig(addr string, handler http.Handler, logger *zap.Logger) ServerConfig {
-	return ServerConfig{
+// DefaultServerConfig returns a Config with sensible defaults.
+func DefaultServerConfig(addr string, handler http.Handler, logger *zap.Logger) Config {
+	return Config{
 		Addr:              addr,
 		Handler:           handler,
 		Logger:            logger,
@@ -45,7 +45,7 @@ type ManagedServer struct {
 }
 
 // NewManagedServer creates a new managed HTTP server.
-func NewManagedServer(name string, cfg ServerConfig) *ManagedServer {
+func NewManagedServer(name string, cfg Config) *ManagedServer {
 	errLog, _ := zap.NewStdLogAt(cfg.Logger, zapcore.ErrorLevel)
 
 	srv := &http.Server{

@@ -83,7 +83,7 @@ func ParseAPIKey(displayKey string) (prefix string, secret string, err error) {
 
 var alphanumeric = []byte("abcdefghijklmnopqrstuvwxyz0123456789")
 
-// base62Alphabet includes A-Za-z0-9 (no special characters)
+// base62Alphabet includes A-Za-z0-9 (no special characters).
 const base62Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
 func encodeBase62(data []byte) string {

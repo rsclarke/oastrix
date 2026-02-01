@@ -15,7 +15,7 @@ func TestGenerate(t *testing.T) {
 	}
 
 	for _, c := range tok {
-		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') {
 			t.Errorf("token contains invalid character: %c", c)
 		}
 	}

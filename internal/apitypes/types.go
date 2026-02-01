@@ -1,5 +1,5 @@
-// Package api defines the API request and response types.
-package api
+// Package apitypes defines the API request and response types.
+package apitypes
 
 // CreateTokenRequest is the request body for creating a new token.
 type CreateTokenRequest struct {

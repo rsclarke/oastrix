@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rsclarke/oastrix/internal/api"
+	"github.com/rsclarke/oastrix/internal/apitypes"
 	"github.com/rsclarke/oastrix/internal/auth"
 	"github.com/rsclarke/oastrix/internal/db"
 )
@@ -20,25 +20,25 @@ func setupTestAPIServer(t *testing.T) (*APIServer, string, func()) {
 	if err != nil {
 		t.Fatalf("create temp file: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	database, err := db.Open(tmpFile.Name())
 	if err != nil {
-		os.Remove(tmpFile.Name())
+		_ = os.Remove(tmpFile.Name())
 		t.Fatalf("open database: %v", err)
 	}
 
 	displayKey, prefix, hash, err := auth.GenerateAPIKey()
 	if err != nil {
-		database.Close()
-		os.Remove(tmpFile.Name())
+		_ = database.Close()
+		_ = os.Remove(tmpFile.Name())
 		t.Fatalf("generate API key: %v", err)
 	}
 
 	_, err = db.CreateAPIKey(database, prefix, hash)
 	if err != nil {
-		database.Close()
-		os.Remove(tmpFile.Name())
+		_ = database.Close()
+		_ = os.Remove(tmpFile.Name())
 		t.Fatalf("create API key: %v", err)
 	}
 
@@ -48,8 +48,8 @@ func setupTestAPIServer(t *testing.T) (*APIServer, string, func()) {
 	}
 
 	cleanup := func() {
-		database.Close()
-		os.Remove(tmpFile.Name())
+		_ = database.Close()
+		_ = os.Remove(tmpFile.Name())
 	}
 
 	return srv, displayKey, cleanup
@@ -69,7 +69,9 @@ func TestAuthMiddleware_MissingHeader(t *testing.T) {
 	}
 
 	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	if resp["error"] != "unauthorized" {
 		t.Errorf("expected error 'unauthorized', got %q", resp["error"])
 	}
@@ -139,7 +141,7 @@ func TestCreateToken(t *testing.T) {
 		t.Errorf("expected status 200, got %d", w.Code)
 	}
 
-	var resp api.CreateTokenResponse
+	var resp apitypes.CreateTokenResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -168,8 +170,10 @@ func TestGetInteractions(t *testing.T) {
 	createW := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(createW, createReq)
 
-	var createResp api.CreateTokenResponse
-	json.NewDecoder(createW.Body).Decode(&createResp)
+	var createResp apitypes.CreateTokenResponse
+	if err := json.NewDecoder(createW.Body).Decode(&createResp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 
 	req := httptest.NewRequest("GET", "/v1/tokens/"+createResp.Token+"/interactions", nil)
 	req.Header.Set("Authorization", "Bearer "+displayKey)
@@ -181,7 +185,7 @@ func TestGetInteractions(t *testing.T) {
 		t.Errorf("expected status 200, got %d", w.Code)
 	}
 
-	var resp api.GetInteractionsResponse
+	var resp apitypes.GetInteractionsResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -219,8 +223,10 @@ func TestDeleteToken(t *testing.T) {
 	createW := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(createW, createReq)
 
-	var createResp api.CreateTokenResponse
-	json.NewDecoder(createW.Body).Decode(&createResp)
+	var createResp apitypes.CreateTokenResponse
+	if err := json.NewDecoder(createW.Body).Decode(&createResp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 
 	req := httptest.NewRequest("DELETE", "/v1/tokens/"+createResp.Token, nil)
 	req.Header.Set("Authorization", "Bearer "+displayKey)
@@ -233,7 +239,9 @@ func TestDeleteToken(t *testing.T) {
 	}
 
 	var resp map[string]bool
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	if !resp["deleted"] {
 		t.Error("expected deleted to be true")
 	}
@@ -280,8 +288,10 @@ func TestTokenOwnership_CannotAccessOtherKeysToken(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", createW.Code)
 	}
 
-	var createResp api.CreateTokenResponse
-	json.NewDecoder(createW.Body).Decode(&createResp)
+	var createResp apitypes.CreateTokenResponse
+	if err := json.NewDecoder(createW.Body).Decode(&createResp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	tokenValue := createResp.Token
 
 	// Create a second API key
