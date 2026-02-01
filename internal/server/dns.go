@@ -221,7 +221,9 @@ func (s *DNSServer) handleDNS(w dns.ResponseWriter, r *dns.Msg) {
 		}
 	}
 
-	_ = w.WriteMsg(m)
+	if err := w.WriteMsg(m); err != nil {
+		s.Logger.Debug("failed to write DNS response", zap.Error(err))
+	}
 }
 
 func extractTokenFromQName(qname, domain string) string {
