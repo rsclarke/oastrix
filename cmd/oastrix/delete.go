@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -32,7 +33,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	token := args[0]
-	if err := c.DeleteToken(token); err != nil {
+	if err := c.DeleteToken(context.Background(), token); err != nil {
 		return err
 	}
 

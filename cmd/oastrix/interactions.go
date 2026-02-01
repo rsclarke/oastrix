@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -32,7 +33,7 @@ func runInteractions(cmd *cobra.Command, args []string) error {
 	}
 
 	token := args[0]
-	resp, err := c.GetInteractions(token)
+	resp, err := c.GetInteractions(context.Background(), token)
 	if err != nil {
 		return err
 	}

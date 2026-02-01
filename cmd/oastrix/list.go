@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -30,7 +31,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	resp, err := c.ListTokens()
+	resp, err := c.ListTokens(context.Background())
 	if err != nil {
 		return err
 	}

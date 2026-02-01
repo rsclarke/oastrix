@@ -3,6 +3,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,14 +52,14 @@ func WithHTTPClient(httpClient HTTPClient) Option {
 }
 
 // CreateToken creates a new token with the given label.
-func (c *Client) CreateToken(label string) (*api.CreateTokenResponse, error) {
+func (c *Client) CreateToken(ctx context.Context, label string) (*api.CreateTokenResponse, error) {
 	reqBody := api.CreateTokenRequest{Label: label}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", c.BaseURL+"/v1/tokens", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", c.BaseURL+"/v1/tokens", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +84,8 @@ func (c *Client) CreateToken(label string) (*api.CreateTokenResponse, error) {
 }
 
 // GetInteractions retrieves all interactions for the specified token.
-func (c *Client) GetInteractions(token string) (*api.GetInteractionsResponse, error) {
-	req, err := http.NewRequest("GET", c.BaseURL+"/v1/tokens/"+token+"/interactions", nil)
+func (c *Client) GetInteractions(ctx context.Context, token string) (*api.GetInteractionsResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.BaseURL+"/v1/tokens/"+token+"/interactions", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -108,8 +109,8 @@ func (c *Client) GetInteractions(token string) (*api.GetInteractionsResponse, er
 }
 
 // ListTokens retrieves all tokens associated with the API key.
-func (c *Client) ListTokens() (*api.ListTokensResponse, error) {
-	req, err := http.NewRequest("GET", c.BaseURL+"/v1/tokens", nil)
+func (c *Client) ListTokens(ctx context.Context) (*api.ListTokensResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.BaseURL+"/v1/tokens", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -133,8 +134,8 @@ func (c *Client) ListTokens() (*api.ListTokensResponse, error) {
 }
 
 // DeleteToken removes the specified token.
-func (c *Client) DeleteToken(token string) error {
-	req, err := http.NewRequest("DELETE", c.BaseURL+"/v1/tokens/"+token, nil)
+func (c *Client) DeleteToken(ctx context.Context, token string) error {
+	req, err := http.NewRequestWithContext(ctx, "DELETE", c.BaseURL+"/v1/tokens/"+token, nil)
 	if err != nil {
 		return err
 	}
