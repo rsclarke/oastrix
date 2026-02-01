@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -32,7 +33,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	resp, err := c.CreateToken(generateFlags.label)
+	resp, err := c.CreateToken(context.Background(), generateFlags.label)
 	if err != nil {
 		return err
 	}
