@@ -1,0 +1,55 @@
+linters:
+  enable:
+    # Default linters
+    - errcheck      # unchecked errors
+    - gosimple      # simplifications
+    - govet         # suspicious constructs
+    - ineffassign   # unused assignments
+    - staticcheck   # comprehensive static analysis
+    - unused        # unused code
+
+    # Style & conventions (matches AGENTS.md rules)
+    - gofmt         # formatting
+    - goimports     # import grouping
+    - revive        # extensible linter (replaces golint)
+    - stylecheck    # Google Go style
+
+    # Error handling
+    - errorlint     # error wrapping issues
+    - nilerr        # returning nil after checking error
+
+    # Code quality
+    - unconvert     # unnecessary type conversions
+    - unparam       # unused parameters
+
+    # Documentation
+    - godot         # comments end with period
+
+    # Modernization
+    - gofumpt       # stricter gofmt (catches extra blank lines)
+    - predeclared   # flags shadowing of predeclared identifiers
+
+linters-settings:
+  revive:
+    rules:
+      - name: context-as-argument      # ctx must be first param
+      - name: var-naming               # naming conventions
+      - name: exported                 # exported must have doc comments
+      - name: package-comments         # package doc comments
+      - name: receiver-naming          # short receiver names
+      - name: indent-error-flow        # error handling style
+
+  stylecheck:
+    checks:
+      - all
+      - -ST1003  # allow underscores in some cases
+
+  errorlint:
+    errorf: true        # check fmt.Errorf wrapping
+    asserts: true       # check type assertions
+    comparison: true    # check error comparisons
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
