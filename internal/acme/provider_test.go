@@ -66,6 +66,53 @@ func TestProvider_IgnoresNonTXT(t *testing.T) {
 	}
 }
 
+func TestProvider_MultipleValuesForSameName(t *testing.T) {
+	store := NewTXTStore()
+	p := &Provider{Store: store}
+	ctx := context.Background()
+	zone := "example.com."
+
+	apexRecs := []libdns.Record{
+		libdns.TXT{Name: "_acme-challenge", Text: "token-apex"},
+	}
+	wildcardRecs := []libdns.Record{
+		libdns.TXT{Name: "_acme-challenge", Text: "token-wildcard"},
+	}
+
+	if _, err := p.AppendRecords(ctx, zone, apexRecs); err != nil {
+		t.Fatalf("AppendRecords (apex) failed: %v", err)
+	}
+	if _, err := p.AppendRecords(ctx, zone, wildcardRecs); err != nil {
+		t.Fatalf("AppendRecords (wildcard) failed: %v", err)
+	}
+
+	vals := store.Get("_acme-challenge.example.com")
+	if len(vals) != 2 {
+		t.Fatalf("expected 2 values, got %d: %v", len(vals), vals)
+	}
+
+	if _, err := p.DeleteRecords(ctx, zone, apexRecs); err != nil {
+		t.Fatalf("DeleteRecords (apex) failed: %v", err)
+	}
+
+	vals = store.Get("_acme-challenge.example.com")
+	if len(vals) != 1 {
+		t.Fatalf("expected 1 value after delete, got %d: %v", len(vals), vals)
+	}
+	if vals[0] != "token-wildcard" {
+		t.Errorf("expected token-wildcard to remain, got %s", vals[0])
+	}
+
+	if _, err := p.DeleteRecords(ctx, zone, wildcardRecs); err != nil {
+		t.Fatalf("DeleteRecords (wildcard) failed: %v", err)
+	}
+
+	vals = store.Get("_acme-challenge.example.com")
+	if len(vals) != 0 {
+		t.Errorf("expected empty after all deletes, got %v", vals)
+	}
+}
+
 func TestAbsoluteName(t *testing.T) {
 	tests := []struct {
 		zone     string

@@ -84,6 +84,67 @@ func TestTXTStore_Normalization(t *testing.T) {
 	}
 }
 
+func TestTXTStore_ConcurrentPresent(t *testing.T) {
+	s := NewTXTStore()
+	const fqdn = "_acme-challenge.example.com"
+	done := make(chan struct{})
+
+	go func() {
+		s.Add(fqdn, "token-apex")
+		done <- struct{}{}
+	}()
+
+	go func() {
+		s.Add(fqdn, "token-wildcard")
+		done <- struct{}{}
+	}()
+
+	<-done
+	<-done
+
+	vals := s.Get(fqdn)
+	if len(vals) != 2 {
+		t.Fatalf("expected 2 values, got %d: %v", len(vals), vals)
+	}
+
+	hasApex, hasWildcard := false, false
+	for _, v := range vals {
+		if v == "token-apex" {
+			hasApex = true
+		}
+		if v == "token-wildcard" {
+			hasWildcard = true
+		}
+	}
+	if !hasApex || !hasWildcard {
+		t.Errorf("missing expected tokens, got %v", vals)
+	}
+}
+
+func TestTXTStore_CleanUpRemovesOnlySpecificToken(t *testing.T) {
+	s := NewTXTStore()
+	const fqdn = "_acme-challenge.example.com"
+
+	s.Add(fqdn, "token-apex")
+	s.Add(fqdn, "token-wildcard")
+
+	s.Remove(fqdn, "token-apex")
+
+	vals := s.Get(fqdn)
+	if len(vals) != 1 {
+		t.Fatalf("expected 1 value after cleanup, got %d: %v", len(vals), vals)
+	}
+	if vals[0] != "token-wildcard" {
+		t.Errorf("expected token-wildcard to remain, got %s", vals[0])
+	}
+
+	s.Remove(fqdn, "token-wildcard")
+	vals = s.Get(fqdn)
+	if len(vals) != 0 {
+		t.Errorf("expected empty after all cleanup, got %v", vals)
+	}
+}
+
 func TestNormalizeName(t *testing.T) {
 	tests := []struct {
 		input    string
