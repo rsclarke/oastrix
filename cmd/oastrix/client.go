@@ -1,3 +1,4 @@
+// Package main implements the oastrix CLI.
 package main
 
 import (

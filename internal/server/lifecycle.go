@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// ServerConfig holds configuration for an HTTP server.
 type ServerConfig struct {
 	Addr              string
 	Handler           http.Handler
@@ -21,6 +22,7 @@ type ServerConfig struct {
 	WriteTimeout      time.Duration
 }
 
+// DefaultServerConfig returns a ServerConfig with sensible defaults.
 func DefaultServerConfig(addr string, handler http.Handler, logger *zap.Logger) ServerConfig {
 	return ServerConfig{
 		Addr:              addr,
@@ -32,6 +34,7 @@ func DefaultServerConfig(addr string, handler http.Handler, logger *zap.Logger) 
 	}
 }
 
+// ManagedServer wraps an HTTP server with lifecycle management.
 type ManagedServer struct {
 	server   *http.Server
 	logger   *zap.Logger
@@ -41,6 +44,7 @@ type ManagedServer struct {
 	startErr error
 }
 
+// NewManagedServer creates a new managed HTTP server.
 func NewManagedServer(name string, cfg ServerConfig) *ManagedServer {
 	errLog, _ := zap.NewStdLogAt(cfg.Logger, zapcore.ErrorLevel)
 
@@ -65,6 +69,7 @@ func NewManagedServer(name string, cfg ServerConfig) *ManagedServer {
 	}
 }
 
+// Start begins listening and serving in a background goroutine.
 func (m *ManagedServer) Start() {
 	go func() {
 		var err error
@@ -80,6 +85,7 @@ func (m *ManagedServer) Start() {
 	}()
 }
 
+// WaitForStartup waits for the server to start or fail within a timeout.
 func (m *ManagedServer) WaitForStartup(timeout time.Duration) error {
 	select {
 	case err := <-m.errCh:
@@ -93,6 +99,7 @@ func (m *ManagedServer) WaitForStartup(timeout time.Duration) error {
 	}
 }
 
+// Shutdown gracefully stops the server.
 func (m *ManagedServer) Shutdown(ctx context.Context) {
 	if m.startErr != nil {
 		return

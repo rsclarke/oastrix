@@ -9,6 +9,7 @@ const tokenLength = 12
 
 var charset = []byte("abcdefghijklmnopqrstuvwxyz0123456789")
 
+// Generate creates a new random OAST token.
 func Generate() (string, error) {
 	b := make([]byte, tokenLength)
 	randomBytes := make([]byte, tokenLength)
