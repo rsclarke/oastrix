@@ -41,6 +41,6 @@ func runList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), string(b))
-	return nil
+	_, err = fmt.Fprintln(cmd.OutOrStdout(), string(b))
+	return err
 }
