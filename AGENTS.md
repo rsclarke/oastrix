@@ -14,6 +14,29 @@ Full reference: [docs/go-style-guide.md](docs/go-style-guide.md)
 - Goroutines must be stoppable via context cancellation
 - Prefer `any` over `interface{}`
 
+## Branches
+
+Follow [Conventional Branch](https://conventional-branch.github.io/) when creating branches.
+
+**Format**: `<prefix>/<issue-number>-<description>`
+
+**Prefixes**:
+- `feature/` or `feat/` – new features
+- `bugfix/` or `fix/` – bug fixes
+- `hotfix/` – urgent production fixes
+- `release/` – release preparation
+- `chore/` – non-code tasks (deps, docs)
+
+**Rules**:
+- Use lowercase letters, numbers, and hyphens only
+- No consecutive, leading, or trailing hyphens
+- Keep descriptions concise but clear
+
+**Examples**:
+- `feat/123-add-login`
+- `fix/456-header-bug`
+- `chore/update-dependencies`
+
 ## Commits
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) when writing commit messages.
