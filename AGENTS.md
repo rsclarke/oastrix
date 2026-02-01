@@ -14,6 +14,10 @@ Full reference: [docs/go-style-guide.md](docs/go-style-guide.md)
 - Goroutines must be stoppable via context cancellation
 - Prefer `any` over `interface{}`
 
+## Commits
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) when writing commit messages.
+
 ## Commands
 
 ```bash
