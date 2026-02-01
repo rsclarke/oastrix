@@ -32,13 +32,13 @@ func Open(dbPath string) (*sql.DB, error) {
 	}
 	for _, pragma := range pragmas {
 		if _, err := db.Exec(pragma); err != nil {
-			db.Close()
+			_ = db.Close()
 			return nil, fmt.Errorf("exec pragma %q: %w", pragma, err)
 		}
 	}
 
 	if err := applyMigrations(db); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("apply migrations: %w", err)
 	}
 
@@ -133,7 +133,7 @@ func ListTokensByAPIKey(d *sql.DB, apiKeyID int64) ([]TokenWithCount, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var tokens []TokenWithCount
 	for rows.Next() {

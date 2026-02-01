@@ -41,7 +41,7 @@ func GetInteractionsByToken(d *sql.DB, tokenID int64) ([]models.Interaction, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var interactions []models.Interaction
 	for rows.Next() {

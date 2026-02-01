@@ -14,7 +14,7 @@ func TestOpenCreatesDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		t.Error("database file was not created")
@@ -29,7 +29,7 @@ func TestMigrationsApplied(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	tables := []string{"schema_migrations", "api_keys", "tokens", "interactions", "http_interactions", "dns_interactions"}
 	for _, table := range tables {
@@ -49,7 +49,7 @@ func TestForeignKeysEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	var fkEnabled int
 	err = db.QueryRow("PRAGMA foreign_keys").Scan(&fkEnabled)
@@ -69,7 +69,7 @@ func TestCascadeDelete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open failed: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	_, err = db.Exec("INSERT INTO tokens (token, created_at) VALUES ('test-token', 1234567890)")
 	if err != nil {
