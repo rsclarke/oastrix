@@ -1,24 +1,23 @@
 package server
 
 import (
-	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/caddyserver/certmagic"
-	"github.com/rsclarke/oastrix/internal/db"
-	"github.com/rsclarke/oastrix/internal/logging"
+	"github.com/rsclarke/oastrix/internal/events"
+	"github.com/rsclarke/oastrix/internal/plugins"
 	"go.uber.org/zap"
 )
 
 // HTTPServer handles HTTP requests and records interactions.
 type HTTPServer struct {
-	DB       *sql.DB
+	Pipeline *plugins.Pipeline
 	Domain   string
 	PublicIP string
 	Logger   *zap.Logger
@@ -97,20 +96,6 @@ func (s *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tok, err := db.GetTokenByValue(s.DB, token)
-	if err != nil {
-		s.Logger.Error("lookup token failed", logging.Token(token), zap.Error(err))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-		return
-	}
-	if tok == nil {
-		s.Logger.Debug("unknown token", logging.Token(token))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-		return
-	}
-
 	remoteIP, remotePortStr, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		remoteIP = r.RemoteAddr
@@ -127,19 +112,10 @@ func (s *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	summary := fmt.Sprintf("%s %s %s", r.Method, r.URL.Path, r.Proto)
 
-	interactionID, err := db.CreateInteraction(s.DB, tok.ID, "http", remoteIP, remotePort, tls, summary)
-	if err != nil {
-		s.Logger.Error("create interaction failed", zap.Error(err))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-		return
-	}
-
 	headers := make(map[string][]string)
 	for k, v := range r.Header {
 		headers[k] = v
 	}
-	headersJSON, _ := json.Marshal(headers)
 
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB limit
 	body, err := io.ReadAll(r.Body)
@@ -148,11 +124,47 @@ func (s *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		body = nil
 	}
 
-	err = db.CreateHTTPInteraction(s.DB, interactionID, r.Method, scheme, r.Host, r.URL.Path, r.URL.RawQuery, r.Proto, string(headersJSON), body)
-	if err != nil {
-		s.Logger.Error("create http interaction failed", zap.Error(err))
+	draft := &events.InteractionDraft{
+		TokenValue: token,
+		Kind:       events.KindHTTP,
+		OccurredAt: time.Now().Unix(),
+		RemoteIP:   remoteIP,
+		RemotePort: remotePort,
+		TLS:        tls,
+		Summary:    summary,
+		HTTP: &events.HTTPDraft{
+			Method:  r.Method,
+			Scheme:  scheme,
+			Host:    r.Host,
+			Path:    r.URL.Path,
+			Query:   r.URL.RawQuery,
+			Proto:   r.Proto,
+			Headers: headers,
+			Body:    body,
+		},
+		Attributes: make(map[string]any),
 	}
 
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("ok"))
+	resp := &events.HTTPResponsePlan{
+		Status:  200,
+		Headers: make(map[string]string),
+		Body:    []byte("ok"),
+	}
+
+	e := &events.HTTPEvent{
+		Event:   events.Event{Draft: draft},
+		Req:     r,
+		Resp:    resp,
+		Scratch: make(map[string]any),
+	}
+
+	if err := s.Pipeline.ProcessHTTP(r.Context(), e); err != nil {
+		s.Logger.Error("pipeline error", zap.Error(err))
+	}
+
+	for k, v := range e.Resp.Headers {
+		w.Header().Set(k, v)
+	}
+	w.WriteHeader(e.Resp.Status)
+	_, _ = w.Write(e.Resp.Body)
 }

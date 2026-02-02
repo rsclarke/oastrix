@@ -53,9 +53,24 @@ func (p *Plugin) OnPreStore(ctx context.Context, e *events.Event) error {
 	return nil
 }
 
-// Store persists an interaction draft to the database and returns the interaction ID.
-// It creates the base interaction, the kind-specific record (HTTP or DNS), and any attributes.
-func (p *Plugin) Store(ctx context.Context, draft *events.InteractionDraft) (int64, error) {
+// ResolveTokenID looks up a token by its value and returns the ID.
+func (p *Plugin) ResolveTokenID(_ context.Context, tokenValue string) (int64, bool, error) {
+	token, err := db.GetTokenByValue(p.db, tokenValue)
+	if err != nil {
+		return 0, false, err
+	}
+	if token == nil {
+		return 0, false, nil
+	}
+	return token.ID, true, nil
+}
+
+// CreateInteraction persists an interaction draft to the database and returns the interaction ID.
+func (p *Plugin) CreateInteraction(_ context.Context, draft *events.InteractionDraft) (int64, error) {
+	if draft.TokenID == 0 {
+		return 0, nil
+	}
+
 	id, err := db.CreateInteraction(
 		p.db,
 		draft.TokenID,
@@ -111,11 +126,10 @@ func (p *Plugin) Store(ctx context.Context, draft *events.InteractionDraft) (int
 		}
 	}
 
-	if len(draft.Attributes) > 0 {
-		if err := db.SaveAttributes(p.db, id, draft.Attributes); err != nil {
-			return 0, fmt.Errorf("save attributes: %w", err)
-		}
-	}
-
 	return id, nil
+}
+
+// SaveAttributes persists plugin attributes for an interaction.
+func (p *Plugin) SaveAttributes(_ context.Context, interactionID int64, attrs map[string]any) error {
+	return db.SaveAttributes(p.db, interactionID, attrs)
 }
