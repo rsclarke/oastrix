@@ -17,6 +17,7 @@ import (
 	"github.com/rsclarke/oastrix/internal/apitypes"
 	"github.com/rsclarke/oastrix/internal/auth"
 	"github.com/rsclarke/oastrix/internal/db"
+	"github.com/rsclarke/oastrix/internal/plugins"
 	"github.com/rsclarke/oastrix/internal/token"
 	"go.uber.org/zap"
 )
@@ -38,6 +39,7 @@ type APIServer struct {
 	Domain   string
 	Logger   *zap.Logger
 	PublicIP string
+	Plugins  plugins.PluginRegistry
 }
 
 // AuthMiddleware validates API key authentication for protected routes.
@@ -90,6 +92,7 @@ func (s *APIServer) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/tokens", s.handleListTokens)
 	mux.HandleFunc("GET /v1/tokens/{token}/interactions", s.handleGetInteractions)
 	mux.HandleFunc("DELETE /v1/tokens/{token}", s.handleDeleteToken)
+	mux.HandleFunc("GET /v1/plugins", s.handleListPlugins)
 
 	return s.AuthMiddleware(mux)
 }
@@ -304,6 +307,29 @@ func (s *APIServer) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, apitypes.DeleteTokenResponse{Deleted: true})
+}
+
+func (s *APIServer) handleListPlugins(w http.ResponseWriter, _ *http.Request) {
+	if s.Plugins == nil {
+		writeJSON(w, http.StatusOK, apitypes.ListPluginsResponse{Plugins: []apitypes.PluginInfo{}})
+		return
+	}
+
+	pluginInfos := s.Plugins.ListPlugins()
+	resp := apitypes.ListPluginsResponse{
+		Plugins: make([]apitypes.PluginInfo, 0, len(pluginInfos)),
+	}
+
+	for _, p := range pluginInfos {
+		resp.Plugins = append(resp.Plugins, apitypes.PluginInfo{
+			ID:      p.ID,
+			Type:    string(p.Type),
+			Enabled: p.Enabled,
+			Config:  p.Config,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

@@ -28,6 +28,9 @@ func New(database *sql.DB) *Plugin {
 // ID returns the plugin identifier.
 func (p *Plugin) ID() string { return "storage" }
 
+// IsCore returns true to identify this as a core plugin.
+func (p *Plugin) IsCore() bool { return true }
+
 // Init initializes the plugin with the given context.
 func (p *Plugin) Init(ctx plugins.InitContext) error {
 	p.logger = ctx.Logger.Named("storage")

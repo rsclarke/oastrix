@@ -11,6 +11,7 @@ import (
 	"github.com/rsclarke/oastrix/internal/apitypes"
 	"github.com/rsclarke/oastrix/internal/auth"
 	"github.com/rsclarke/oastrix/internal/db"
+	"github.com/rsclarke/oastrix/internal/plugins"
 )
 
 func setupTestAPIServer(t *testing.T) (*APIServer, string, func()) {
@@ -335,5 +336,99 @@ func TestTokenOwnership_CannotAccessOtherKeysToken(t *testing.T) {
 
 	if getW2.Code != http.StatusOK {
 		t.Errorf("expected status 200 when accessing own token, got %d", getW2.Code)
+	}
+}
+
+type mockPlugin struct {
+	id     string
+	isCore bool
+	config map[string]any
+}
+
+func (m *mockPlugin) ID() string                       { return m.id }
+func (m *mockPlugin) Init(_ plugins.InitContext) error { return nil }
+func (m *mockPlugin) IsCore() bool                     { return m.isCore }
+func (m *mockPlugin) Config() map[string]any           { return m.config }
+
+func TestListPlugins(t *testing.T) {
+	srv, displayKey, cleanup := setupTestAPIServer(t)
+	defer cleanup()
+
+	req := httptest.NewRequest("GET", "/v1/plugins", nil)
+	req.Header.Set("Authorization", "Bearer "+displayKey)
+	w := httptest.NewRecorder()
+
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	var resp apitypes.ListPluginsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if resp.Plugins == nil {
+		t.Error("expected plugins to be non-nil")
+	}
+
+	if len(resp.Plugins) != 0 {
+		t.Errorf("expected empty plugins list for server without registry, got %d", len(resp.Plugins))
+	}
+}
+
+func TestListPlugins_WithRegistry(t *testing.T) {
+	srv, displayKey, cleanup := setupTestAPIServer(t)
+	defer cleanup()
+
+	pipeline := plugins.NewPipeline(nil)
+	corePlugin := &mockPlugin{id: "storage", isCore: true}
+	featurePlugin := &mockPlugin{
+		id:     "dnsexfil",
+		isCore: false,
+		config: map[string]any{"encodings": []string{"base64", "base32", "hex"}},
+	}
+	pipeline.Register(corePlugin)
+	pipeline.Register(featurePlugin)
+	srv.Plugins = pipeline
+
+	req := httptest.NewRequest("GET", "/v1/plugins", nil)
+	req.Header.Set("Authorization", "Bearer "+displayKey)
+	w := httptest.NewRecorder()
+
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	var resp apitypes.ListPluginsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if len(resp.Plugins) != 2 {
+		t.Fatalf("expected 2 plugins, got %d", len(resp.Plugins))
+	}
+
+	if resp.Plugins[0].ID != "storage" {
+		t.Errorf("expected first plugin ID 'storage', got %q", resp.Plugins[0].ID)
+	}
+	if resp.Plugins[0].Type != "core" {
+		t.Errorf("expected first plugin type 'core', got %q", resp.Plugins[0].Type)
+	}
+	if !resp.Plugins[0].Enabled {
+		t.Error("expected first plugin to be enabled")
+	}
+
+	if resp.Plugins[1].ID != "dnsexfil" {
+		t.Errorf("expected second plugin ID 'dnsexfil', got %q", resp.Plugins[1].ID)
+	}
+	if resp.Plugins[1].Type != "feature" {
+		t.Errorf("expected second plugin type 'feature', got %q", resp.Plugins[1].Type)
+	}
+	if resp.Plugins[1].Config == nil {
+		t.Error("expected second plugin to have config")
 	}
 }
