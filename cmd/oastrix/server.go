@@ -61,7 +61,7 @@ func init() {
 
 	serverCmd.Flags().IntVar(&serverFlags.httpPort, "http-port", getEnvInt("OASTRIX_HTTP_PORT", 80), "HTTP port to listen on")
 	serverCmd.Flags().IntVar(&serverFlags.httpsPort, "https-port", getEnvInt("OASTRIX_HTTPS_PORT", 443), "HTTPS port to listen on")
-	serverCmd.Flags().IntVar(&serverFlags.apiPort, "api-port", getEnvInt("OASTRIX_API_PORT", 8081), "API port to listen on")
+	serverCmd.Flags().IntVar(&serverFlags.apiPort, "api-port", getEnvInt("OASTRIX_API_PORT", 8443), "API port to listen on")
 	serverCmd.Flags().IntVar(&serverFlags.dnsPort, "dns-port", getEnvInt("OASTRIX_DNS_PORT", 53), "DNS port to listen on (53 requires root)")
 	serverCmd.Flags().StringVar(&serverFlags.tlsCert, "tls-cert", "", "path to TLS certificate file (enables manual TLS mode)")
 	serverCmd.Flags().StringVar(&serverFlags.tlsKey, "tls-key", "", "path to TLS key file (enables manual TLS mode)")
@@ -144,23 +144,6 @@ func runServer(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("http server: %w", err)
 	}
 
-	apiSrv := &server.APIServer{
-		DB:       database,
-		Domain:   serverFlags.domain,
-		PublicIP: serverFlags.publicIP,
-		Logger:   logger.Named("api"),
-	}
-
-	apiLogger := logger.Named("api")
-	apiCfg := server.DefaultServerConfig(fmt.Sprintf(":%d", serverFlags.apiPort), apiSrv.Handler(), apiLogger)
-	apiServer := server.NewManagedServer("api", apiCfg)
-
-	logger.Info("starting api server", logging.Port(serverFlags.apiPort))
-	apiServer.Start()
-	if err := apiServer.WaitForStartup(100 * time.Millisecond); err != nil {
-		return fmt.Errorf("api server: %w", err)
-	}
-
 	dnsSrv := &server.DNSServer{
 		Pipeline: pipeline,
 		Domain:   serverFlags.domain,
@@ -173,6 +156,8 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 
 	var httpsServer *server.ManagedServer
+	var apiServer *server.ManagedServer
+	var tlsConfig *tls.Config
 	acmeCtx, acmeCancel := context.WithCancel(context.Background())
 	defer acmeCancel()
 
@@ -185,8 +170,10 @@ func runServer(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("start ACME certificate management: %w", err)
 		}
 
+		tlsConfig = acmeManager.TLSConfig()
+
 		httpsCfg := server.DefaultServerConfig(fmt.Sprintf(":%d", serverFlags.httpsPort), httpSrv, httpsLogger)
-		httpsCfg.TLSConfig = acmeManager.TLSConfig()
+		httpsCfg.TLSConfig = tlsConfig
 		httpsServer = server.NewManagedServer("https", httpsCfg)
 
 		logger.Info("starting https server", logging.Port(serverFlags.httpsPort), logging.TLSMode("acme"))
@@ -205,7 +192,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("load TLS certificate: %w", err)
 		}
 
-		tlsConfig := &tls.Config{
+		tlsConfig = &tls.Config{
 			Certificates: []tls.Certificate{cert},
 		}
 
@@ -222,6 +209,27 @@ func runServer(cmd *cobra.Command, args []string) error {
 		logger.Info("https disabled", zap.String("reason", "no-acme specified without manual TLS certificates"))
 	}
 
+	apiSrv := &server.APIServer{
+		DB:       database,
+		Domain:   serverFlags.domain,
+		PublicIP: serverFlags.publicIP,
+		Logger:   logger.Named("api"),
+	}
+	apiLogger := logger.Named("api")
+	apiCfg := server.DefaultServerConfig(fmt.Sprintf(":%d", serverFlags.apiPort), apiSrv.Handler(), apiLogger)
+
+	if tlsConfig != nil {
+		apiCfg.TLSConfig = tlsConfig
+		apiServer = server.NewManagedServer("api", apiCfg)
+		logger.Info("starting api server", logging.Port(serverFlags.apiPort), logging.TLSMode("https"))
+		apiServer.Start()
+		if err := apiServer.WaitForStartup(100 * time.Millisecond); err != nil {
+			return fmt.Errorf("api server: %w", err)
+		}
+	} else {
+		logger.Warn("api server disabled", zap.String("reason", "TLS required but not configured"))
+	}
+
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
@@ -235,7 +243,9 @@ func runServer(cmd *cobra.Command, args []string) error {
 		httpsServer.Shutdown(ctx)
 	}
 	httpServer.Shutdown(ctx)
-	apiServer.Shutdown(ctx)
+	if apiServer != nil {
+		apiServer.Shutdown(ctx)
+	}
 	dnsSrv.Shutdown(ctx)
 
 	return nil
