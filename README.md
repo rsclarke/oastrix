@@ -91,7 +91,7 @@ TIME                  KIND  REMOTE            SUMMARY
 | --domain | OASTRIX_DOMAIN | localhost | Domain for token URLs |
 | --http-port | OASTRIX_HTTP_PORT | 80 | HTTP capture port |
 | --https-port | OASTRIX_HTTPS_PORT | 443 | HTTPS capture port |
-| --api-port | OASTRIX_API_PORT | 8081 | API server port |
+| --api-port | OASTRIX_API_PORT | 8443 | API server port (HTTPS only) |
 | --dns-port | OASTRIX_DNS_PORT | 53 | DNS server port |
 | --public-ip | OASTRIX_PUBLIC_IP | - | Public IP address of the server (see below) |
 | --db | OASTRIX_DB | oastrix.db | SQLite database path |
@@ -112,7 +112,9 @@ TIME                  KIND  REMOTE            SUMMARY
 |-------|----------|
 | (default) | ACME enabled, automatic Let's Encrypt certs |
 | --tls-cert + --tls-key | Manual TLS, uses provided certificates |
-| --no-acme | No HTTPS server |
+| --no-acme | No HTTPS or API server (HTTP/DNS only) |
+
+**Note:** The API server requires TLS and is only available when HTTPS is enabled (either via ACME or manual certificates).
 
 ### Public IP
 
@@ -134,7 +136,7 @@ For development with `--no-acme`, this flag is optional.
 | Flag | Env Var | Default | Description |
 |------|---------|---------|-------------|
 | --api-key | OASTRIX_API_KEY | - | API key (required) |
-| --api-url | OASTRIX_API_URL | http://localhost:8081 | API server URL |
+| --api-url | OASTRIX_API_URL | - | API server URL (required) |
 
 ## Production Deployment
 

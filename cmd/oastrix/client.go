@@ -16,10 +16,13 @@ type clientConfig struct {
 
 func addClientFlags(cmd *cobra.Command, cfg *clientConfig) {
 	cmd.Flags().StringVar(&cfg.apiKey, "api-key", os.Getenv("OASTRIX_API_KEY"), "API key for authentication")
-	cmd.Flags().StringVar(&cfg.apiURL, "api-url", getEnv("OASTRIX_API_URL", "http://localhost:8081"), "API server URL")
+	cmd.Flags().StringVar(&cfg.apiURL, "api-url", os.Getenv("OASTRIX_API_URL"), "API server URL")
 }
 
 func (cfg *clientConfig) newClient() (*client.Client, error) {
+	if cfg.apiURL == "" {
+		return nil, fmt.Errorf("API URL required (use --api-url flag or OASTRIX_API_URL env var)")
+	}
 	if cfg.apiKey == "" {
 		return nil, fmt.Errorf("API key required (use --api-key flag or OASTRIX_API_KEY env var)")
 	}
