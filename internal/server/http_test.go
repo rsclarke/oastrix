@@ -9,6 +9,9 @@ import (
 	"testing"
 
 	"github.com/rsclarke/oastrix/internal/db"
+	"github.com/rsclarke/oastrix/internal/plugins"
+	"github.com/rsclarke/oastrix/internal/plugins/core/defaultresponse"
+	"github.com/rsclarke/oastrix/internal/plugins/core/storage"
 	"go.uber.org/zap"
 )
 
@@ -121,6 +124,24 @@ func TestExtractToken_FromPath(t *testing.T) {
 	}
 }
 
+func setupPipeline(t *testing.T, database *sql.DB) *plugins.Pipeline {
+	t.Helper()
+	logger := zap.NewNop()
+	pipeline := plugins.NewPipeline(logger)
+	store := plugins.NewSQLiteStore(database)
+	pipeline.SetStore(store)
+
+	storagePlugin := storage.New(database)
+	_ = storagePlugin.Init(plugins.InitContext{Logger: logger})
+	pipeline.Register(storagePlugin)
+
+	defaultResp := defaultresponse.New("127.0.0.1")
+	_ = defaultResp.Init(plugins.InitContext{Logger: logger})
+	pipeline.Register(defaultResp)
+
+	return pipeline
+}
+
 func TestHTTPServer_StoresInteraction(t *testing.T) {
 	tmpDB := t.TempDir() + "/test.db"
 	database, err := db.Open(tmpDB)
@@ -137,9 +158,9 @@ func TestHTTPServer_StoresInteraction(t *testing.T) {
 	}
 
 	srv := &HTTPServer{
-		DB:     database,
-		Domain: "oastrix.example.com",
-		Logger: zap.NewNop(),
+		Pipeline: setupPipeline(t, database),
+		Domain:   "oastrix.example.com",
+		Logger:   zap.NewNop(),
 	}
 
 	req := httptest.NewRequest("POST", "http://testtoken123.oastrix.example.com/test/path?foo=bar", strings.NewReader("request body"))
@@ -195,9 +216,9 @@ func TestHTTPServer_UnknownTokenDoesNotError(t *testing.T) {
 	defer func() { _ = os.Remove(tmpDB) }()
 
 	srv := &HTTPServer{
-		DB:     database,
-		Domain: "oastrix.example.com",
-		Logger: zap.NewNop(),
+		Pipeline: setupPipeline(t, database),
+		Domain:   "oastrix.example.com",
+		Logger:   zap.NewNop(),
 	}
 
 	req := httptest.NewRequest("GET", "http://unknowntoken.oastrix.example.com/", nil)
@@ -296,7 +317,7 @@ func TestHTTPServer_InvalidHostReturns404(t *testing.T) {
 	database := setupTestDB(t)
 
 	srv := &HTTPServer{
-		DB:       database,
+		Pipeline: setupPipeline(t, database),
 		Domain:   "oastrix.example.com",
 		PublicIP: "203.0.113.10",
 		Logger:   zap.NewNop(),
@@ -317,7 +338,7 @@ func TestHTTPServer_ValidHostsAccepted(t *testing.T) {
 	database := setupTestDB(t)
 
 	srv := &HTTPServer{
-		DB:       database,
+		Pipeline: setupPipeline(t, database),
 		Domain:   "oastrix.example.com",
 		PublicIP: "203.0.113.10",
 		Logger:   zap.NewNop(),

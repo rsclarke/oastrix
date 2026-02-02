@@ -13,6 +13,9 @@ import (
 	"github.com/rsclarke/oastrix/internal/auth"
 	"github.com/rsclarke/oastrix/internal/db"
 	"github.com/rsclarke/oastrix/internal/logging"
+	"github.com/rsclarke/oastrix/internal/plugins"
+	"github.com/rsclarke/oastrix/internal/plugins/core/defaultresponse"
+	"github.com/rsclarke/oastrix/internal/plugins/core/storage"
 	"github.com/rsclarke/oastrix/internal/server"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -109,8 +112,24 @@ func runServer(cmd *cobra.Command, args []string) error {
 		acme.SetLogger(logger.Named("certmagic"))
 	}
 
+	pipeline := plugins.NewPipeline(logger.Named("pipeline"))
+	store := plugins.NewSQLiteStore(database)
+	pipeline.SetStore(store)
+
+	storagePlugin := storage.New(database)
+	if err := storagePlugin.Init(plugins.InitContext{Logger: logger.Named("storage")}); err != nil {
+		return fmt.Errorf("init storage plugin: %w", err)
+	}
+	pipeline.Register(storagePlugin)
+
+	defaultResp := defaultresponse.New(serverFlags.publicIP)
+	if err := defaultResp.Init(plugins.InitContext{Logger: logger.Named("defaultresponse")}); err != nil {
+		return fmt.Errorf("init defaultresponse plugin: %w", err)
+	}
+	pipeline.Register(defaultResp)
+
 	httpSrv := &server.HTTPServer{
-		DB:       database,
+		Pipeline: pipeline,
 		Domain:   serverFlags.domain,
 		PublicIP: serverFlags.publicIP,
 		Logger:   logger.Named("http"),
