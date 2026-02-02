@@ -31,7 +31,7 @@ func TestMigrationsApplied(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	tables := []string{"schema_migrations", "api_keys", "tokens", "interactions", "http_interactions", "dns_interactions"}
+	tables := []string{"schema_migrations", "api_keys", "tokens", "interactions", "http_interactions", "dns_interactions", "interaction_attributes", "token_plugin_config"}
 	for _, table := range tables {
 		var name string
 		err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name)
