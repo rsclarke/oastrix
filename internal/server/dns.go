@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net"
 	"strings"
@@ -10,14 +9,15 @@ import (
 
 	"github.com/miekg/dns"
 	"github.com/rsclarke/oastrix/internal/acme"
-	"github.com/rsclarke/oastrix/internal/db"
+	"github.com/rsclarke/oastrix/internal/events"
 	"github.com/rsclarke/oastrix/internal/logging"
+	"github.com/rsclarke/oastrix/internal/plugins"
 	"go.uber.org/zap"
 )
 
 // DNSServer handles DNS queries and records interactions.
 type DNSServer struct {
-	DB        *sql.DB
+	Pipeline  *plugins.Pipeline
 	Domain    string
 	PublicIP  string // IP address to return for ns1.<domain> and A queries
 	TXTStore  *acme.TXTStore
@@ -182,18 +182,6 @@ func (s *DNSServer) handleDNS(w dns.ResponseWriter, r *dns.Msg) {
 			continue
 		}
 
-		tok, err := db.GetTokenByValue(s.DB, token)
-		if err != nil {
-			s.Logger.Error("lookup token failed", logging.Token(token), zap.Error(err))
-			m.Rcode = dns.RcodeNameError
-			continue
-		}
-		if tok == nil {
-			s.Logger.Debug("unknown token", logging.Token(token), logging.QName(qname))
-			m.Rcode = dns.RcodeNameError
-			continue
-		}
-
 		summary := fmt.Sprintf("%s %s %s", dns.TypeToString[q.Qtype], qname, protocol)
 
 		rd := 0
@@ -201,24 +189,44 @@ func (s *DNSServer) handleDNS(w dns.ResponseWriter, r *dns.Msg) {
 			rd = 1
 		}
 
-		interactionID, err := db.CreateInteraction(s.DB, tok.ID, "dns", remoteIP, remotePort, false, summary)
-		if err != nil {
-			s.Logger.Error("create dns interaction failed", zap.Error(err))
-			continue
+		draft := &events.InteractionDraft{
+			TokenValue: token,
+			Kind:       events.KindDNS,
+			OccurredAt: time.Now().Unix(),
+			RemoteIP:   remoteIP,
+			RemotePort: remotePort,
+			TLS:        false,
+			Summary:    summary,
+			DNS: &events.DNSDraft{
+				QName:    qname,
+				QType:    int(q.Qtype),
+				QClass:   int(q.Qclass),
+				RD:       rd,
+				Opcode:   r.Opcode,
+				DNSID:    int(r.Id),
+				Protocol: protocol,
+			},
+			Attributes: make(map[string]any),
 		}
 
-		err = db.CreateDNSInteraction(s.DB, interactionID, qname, int(q.Qtype), int(q.Qclass), rd, r.Opcode, int(r.Id), protocol)
-		if err != nil {
-			s.Logger.Error("create dns interaction details failed", zap.Error(err))
+		resp := &events.DNSResponsePlan{
+			RCode:   dns.RcodeSuccess,
+			Answers: nil,
 		}
 
-		if q.Qtype == dns.TypeA {
-			rr := &dns.A{
-				Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
-				A:   net.ParseIP(s.PublicIP),
-			}
-			m.Answer = append(m.Answer, rr)
+		e := &events.DNSEvent{
+			Event:    events.Event{Draft: draft},
+			Req:      r,
+			Resp:     resp,
+			QNameRaw: q.Name,
 		}
+
+		if err := s.Pipeline.ProcessDNS(context.Background(), e); err != nil {
+			s.Logger.Error("pipeline error", zap.Error(err))
+		}
+
+		m.Rcode = e.Resp.RCode
+		m.Answer = append(m.Answer, e.Resp.Answers...)
 	}
 
 	if err := w.WriteMsg(m); err != nil {

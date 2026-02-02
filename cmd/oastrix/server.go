@@ -162,7 +162,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 
 	dnsSrv := &server.DNSServer{
-		DB:       database,
+		Pipeline: pipeline,
 		Domain:   serverFlags.domain,
 		PublicIP: serverFlags.publicIP,
 		TXTStore: txtStore,
