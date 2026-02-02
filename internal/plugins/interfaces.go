@@ -66,3 +66,35 @@ type HTTPResponseHook interface {
 type DNSResponseHook interface {
 	OnDNSResponse(ctx context.Context, e *events.DNSEvent) error
 }
+
+// PluginType indicates whether a plugin is core infrastructure or a feature plugin.
+type PluginType string
+
+// Plugin type constants.
+const (
+	PluginTypeCore    PluginType = "core"
+	PluginTypeFeature PluginType = "feature"
+)
+
+// CorePlugin is an optional interface that core plugins can implement.
+type CorePlugin interface {
+	IsCore() bool
+}
+
+// ConfigurablePlugin is an optional interface for plugins that expose global configuration.
+type ConfigurablePlugin interface {
+	Config() map[string]any
+}
+
+// PluginInfo contains metadata about a registered plugin.
+type PluginInfo struct {
+	ID      string         `json:"id"`
+	Type    PluginType     `json:"type"`
+	Enabled bool           `json:"enabled"`
+	Config  map[string]any `json:"config,omitempty"`
+}
+
+// PluginRegistry provides read access to registered plugins.
+type PluginRegistry interface {
+	ListPlugins() []PluginInfo
+}

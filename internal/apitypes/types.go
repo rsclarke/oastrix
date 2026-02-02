@@ -75,3 +75,16 @@ type DeleteTokenResponse struct {
 type ErrorResponse struct {
 	Error string `json:"error"`
 }
+
+// PluginInfo represents a registered plugin and its configuration.
+type PluginInfo struct {
+	ID      string         `json:"id"`
+	Type    string         `json:"type"`
+	Enabled bool           `json:"enabled"`
+	Config  map[string]any `json:"config,omitempty"`
+}
+
+// ListPluginsResponse is the response body for listing plugins.
+type ListPluginsResponse struct {
+	Plugins []PluginInfo `json:"plugins"`
+}

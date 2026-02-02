@@ -214,6 +214,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 		Domain:   serverFlags.domain,
 		PublicIP: serverFlags.publicIP,
 		Logger:   logger.Named("api"),
+		Plugins:  pipeline,
 	}
 	apiLogger := logger.Named("api")
 	apiCfg := server.DefaultServerConfig(fmt.Sprintf(":%d", serverFlags.apiPort), apiSrv.Handler(), apiLogger)
