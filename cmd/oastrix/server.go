@@ -155,25 +155,31 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 
 	var httpsServer *server.ManagedServer
+	acmeCtx, acmeCancel := context.WithCancel(context.Background())
+	defer acmeCancel()
+
 	httpsLogger := logger.Named("https")
 	if acmeMode {
-		manager := acme.NewManager(serverFlags.domain, serverFlags.acmeEmail, database, serverFlags.acmeStaging, txtStore, serverFlags.publicIP, logger.Named("certmagic"))
+		acmeManager := acme.NewManager(serverFlags.domain, serverFlags.acmeEmail, database, serverFlags.acmeStaging, txtStore, serverFlags.publicIP, logger.Named("certmagic"))
 
-		logger.Info("starting acme certificate acquisition", logging.Domain(serverFlags.domain), zap.Bool("staging", serverFlags.acmeStaging))
-		ctx := context.Background()
-		if err := manager.Manage(ctx); err != nil {
-			return fmt.Errorf("ACME certificate acquisition: %w", err)
+		logger.Info("starting async certificate management", logging.Domain(serverFlags.domain), zap.Bool("staging", serverFlags.acmeStaging))
+		if err := acmeManager.Manage(acmeCtx); err != nil {
+			return fmt.Errorf("start ACME certificate management: %w", err)
 		}
-		logger.Info("acme certificate obtained", logging.Domain(serverFlags.domain))
 
 		httpsCfg := server.DefaultServerConfig(fmt.Sprintf(":%d", serverFlags.httpsPort), httpSrv, httpsLogger)
-		httpsCfg.TLSConfig = manager.TLSConfig()
+		httpsCfg.TLSConfig = acmeManager.TLSConfig()
 		httpsServer = server.NewManagedServer("https", httpsCfg)
 
 		logger.Info("starting https server", logging.Port(serverFlags.httpsPort), logging.TLSMode("acme"))
 		httpsServer.Start()
 		if err := httpsServer.WaitForStartup(100 * time.Millisecond); err != nil {
 			return fmt.Errorf("https server: %w", err)
+		}
+
+		// Start IP certificate management after HTTP server is listening (HTTP-01 requires port 80)
+		if err := acmeManager.ManageIP(acmeCtx); err != nil {
+			return fmt.Errorf("start IP certificate management: %w", err)
 		}
 	} else if manualTLS {
 		cert, err := tls.LoadX509KeyPair(serverFlags.tlsCert, serverFlags.tlsKey)

@@ -9,7 +9,6 @@ import (
 	"net"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/caddyserver/certmagic"
 	certmagicsqlite "github.com/rsclarke/certmagic-sqlite"
@@ -72,8 +71,12 @@ func (m *Manager) newBaseConfig() *certmagic.Config {
 	return cfg
 }
 
-// Manage obtains and manages certificates for the domain and wildcard.
+// Manage starts background certificate management for the domain and wildcard.
 // This should be called after the DNS server is started.
+// Certificates are obtained asynchronously; TLS connections will fail gracefully
+// until certificates are available.
+// The provided context controls the lifetime of background certificate management;
+// cancel it to stop renewals.
 func (m *Manager) Manage(ctx context.Context) error {
 	// Create SQLite storage for certificates using the shared database
 	hostname, _ := os.Hostname()
@@ -112,58 +115,61 @@ func (m *Manager) Manage(ctx context.Context) error {
 
 	m.dnsConfig.Issuers = []certmagic.Issuer{issuer}
 
-	// Manage certificates sequentially with a delay between them.
-	// Both domain and wildcard use the same _acme-challenge.<domain> TXT record.
-	// Let's Encrypt's secondary validators may cache the first TXT record,
-	// causing the wildcard challenge to fail if issued too quickly.
-	// We issue them separately with a delay to allow caches to expire.
-
-	// First: obtain certificate for the apex domain
-	if err := m.dnsConfig.ManageSync(ctx, []string{m.Domain}); err != nil {
-		return fmt.Errorf("manage certificate for %s: %w", m.Domain, err)
+	// Manage apex and wildcard certificates asynchronously.
+	// With multi-value TXT support, both can be issued concurrently since
+	// they share _acme-challenge.<domain> but the TXTStore handles multiple values.
+	if err := m.dnsConfig.ManageAsync(ctx, []string{m.Domain, "*." + m.Domain}); err != nil {
+		return fmt.Errorf("manage certificates for %s: %w", m.Domain, err)
 	}
 
-	// Wait for DNS caches at validators to expire (TXT TTL is 1s, add buffer)
-	time.Sleep(10 * time.Second)
+	m.Logger.Info("started async certificate management", zap.String("domain", m.Domain))
 
-	// Second: obtain certificate for the wildcard
-	if err := m.dnsConfig.ManageSync(ctx, []string{"*." + m.Domain}); err != nil {
-		return fmt.Errorf("manage certificate for *.%s: %w", m.Domain, err)
+	return nil
+}
+
+// ManageIP starts background certificate management for the public IP via HTTP-01.
+// This must be called after the HTTP server is listening on port 80.
+// Only IPv4 is supported; IPv6 HTTP-01 has upstream bugs.
+// The provided context controls the lifetime of background certificate management.
+func (m *Manager) ManageIP(ctx context.Context) error {
+	if m.PublicIP == "" {
+		return nil
 	}
 
-	// Third: obtain certificate for the public IP via HTTP-01
-	// Only IPv4 is supported; IPv6 HTTP-01 has upstream bugs.
+	ip := net.ParseIP(m.PublicIP)
+	if ip == nil {
+		return fmt.Errorf("invalid public IP: %s", m.PublicIP)
+	}
+
+	// Skip IPv6 - HTTP-01 for IPv6 has upstream bugs
 	// See: https://github.com/caddyserver/caddy/issues/7399
-	if m.PublicIP != "" {
-		ip := net.ParseIP(m.PublicIP)
-		if ip == nil {
-			return fmt.Errorf("invalid public IP: %s", m.PublicIP)
-		}
+	if ip.To4() == nil {
+		m.Logger.Warn("skipping IP certificate for IPv6 address (not yet supported)", zap.String("ip", m.PublicIP))
+		return nil
+	}
 
-		// Skip IPv6 - HTTP-01 for IPv6 has upstream bugs
-		if ip.To4() == nil {
-			m.Logger.Warn("skipping IP certificate for IPv6 address (not yet supported)", zap.String("ip", m.PublicIP))
-		} else {
-			m.ipConfig = m.newBaseConfig()
+	var caURL string
+	if m.Staging {
+		caURL = certmagic.LetsEncryptStagingCA
+	} else {
+		caURL = certmagic.LetsEncryptProductionCA
+	}
 
-			ipIssuer := certmagic.NewACMEIssuer(m.ipConfig, certmagic.ACMEIssuer{
-				CA:                      caURL,
-				Email:                   m.Email,
-				Agreed:                  true,
-				Profile:                 "shortlived",
-				DisableTLSALPNChallenge: true, // Use HTTP-01 only
-				Logger:                  m.Logger,
-			})
-			m.ipConfig.Issuers = []certmagic.Issuer{ipIssuer}
+	m.ipConfig = m.newBaseConfig()
 
-			m.Logger.Info("obtaining IP certificate via HTTP-01", zap.String("ip", m.PublicIP))
-			if err := m.ipConfig.ManageSync(ctx, []string{m.PublicIP}); err != nil {
-				m.Logger.Warn("failed to obtain IP certificate", zap.String("ip", m.PublicIP), zap.Error(err))
-				// Don't fail startup - IP cert is optional, HTTP interactions still work
-			} else {
-				m.Logger.Info("IP certificate obtained", zap.String("ip", m.PublicIP))
-			}
-		}
+	ipIssuer := certmagic.NewACMEIssuer(m.ipConfig, certmagic.ACMEIssuer{
+		CA:                      caURL,
+		Email:                   m.Email,
+		Agreed:                  true,
+		Profile:                 "shortlived",
+		DisableTLSALPNChallenge: true, // Use HTTP-01 only
+		Logger:                  m.Logger,
+	})
+	m.ipConfig.Issuers = []certmagic.Issuer{ipIssuer}
+
+	m.Logger.Info("starting async IP certificate management via HTTP-01", zap.String("ip", m.PublicIP))
+	if err := m.ipConfig.ManageAsync(ctx, []string{m.PublicIP}); err != nil {
+		m.Logger.Warn("failed to start IP certificate management", zap.String("ip", m.PublicIP), zap.Error(err))
 	}
 
 	return nil
