@@ -113,13 +113,12 @@ func runServer(cmd *cobra.Command, args []string) error {
 	}
 
 	pipeline := plugins.NewPipeline(logger.Named("pipeline"))
-	store := plugins.NewSQLiteStore(database)
-	pipeline.SetStore(store)
 
 	storagePlugin := storage.New(database)
 	if err := storagePlugin.Init(plugins.InitContext{Logger: logger.Named("storage")}); err != nil {
 		return fmt.Errorf("init storage plugin: %w", err)
 	}
+	pipeline.SetStore(storagePlugin)
 	pipeline.Register(storagePlugin)
 
 	defaultResp := defaultresponse.New(serverFlags.publicIP)

@@ -128,11 +128,10 @@ func setupPipeline(t *testing.T, database *sql.DB) *plugins.Pipeline {
 	t.Helper()
 	logger := zap.NewNop()
 	pipeline := plugins.NewPipeline(logger)
-	store := plugins.NewSQLiteStore(database)
-	pipeline.SetStore(store)
 
 	storagePlugin := storage.New(database)
 	_ = storagePlugin.Init(plugins.InitContext{Logger: logger})
+	pipeline.SetStore(storagePlugin)
 	pipeline.Register(storagePlugin)
 
 	defaultResp := defaultresponse.New("127.0.0.1")

@@ -131,6 +131,62 @@ func TestOnPreStoreUnknownToken(t *testing.T) {
 	}
 }
 
+func TestResolveTokenID(t *testing.T) {
+	database := setupTestDB(t)
+	p := New(database)
+	_ = p.Init(plugins.InitContext{Logger: zap.NewNop()})
+
+	tokenID, err := db.CreateToken(database, "test-token", nil, nil)
+	if err != nil {
+		t.Fatalf("CreateToken failed: %v", err)
+	}
+
+	id, found, err := p.ResolveTokenID(context.Background(), "test-token")
+	if err != nil {
+		t.Fatalf("ResolveTokenID failed: %v", err)
+	}
+	if !found {
+		t.Error("expected token to be found")
+	}
+	if id != tokenID {
+		t.Errorf("ID = %d, want %d", id, tokenID)
+	}
+
+	id, found, err = p.ResolveTokenID(context.Background(), "nonexistent")
+	if err != nil {
+		t.Fatalf("ResolveTokenID failed: %v", err)
+	}
+	if found {
+		t.Error("expected token not to be found")
+	}
+	if id != 0 {
+		t.Errorf("ID = %d, want 0", id)
+	}
+}
+
+func TestCreateInteractionSkipsZeroTokenID(t *testing.T) {
+	database := setupTestDB(t)
+	p := New(database)
+	_ = p.Init(plugins.InitContext{Logger: zap.NewNop()})
+
+	draft := &events.InteractionDraft{
+		TokenID:    0,
+		Kind:       events.KindHTTP,
+		RemoteIP:   "192.168.1.1",
+		RemotePort: 54321,
+		TLS:        false,
+		Summary:    "GET /",
+	}
+
+	id, err := p.CreateInteraction(context.Background(), draft)
+	if err != nil {
+		t.Fatalf("CreateInteraction failed: %v", err)
+	}
+	if id != 0 {
+		t.Errorf("expected 0 ID for zero TokenID, got %d", id)
+	}
+}
+
 func TestStoreHTTPInteraction(t *testing.T) {
 	database := setupTestDB(t)
 	p := New(database)
@@ -160,7 +216,7 @@ func TestStoreHTTPInteraction(t *testing.T) {
 		},
 	}
 
-	id, err := p.Store(context.Background(), draft)
+	id, err := p.CreateInteraction(context.Background(), draft)
 	if err != nil {
 		t.Fatalf("Store failed: %v", err)
 	}
@@ -220,7 +276,7 @@ func TestStoreDNSInteraction(t *testing.T) {
 		},
 	}
 
-	id, err := p.Store(context.Background(), draft)
+	id, err := p.CreateInteraction(context.Background(), draft)
 	if err != nil {
 		t.Fatalf("Store failed: %v", err)
 	}
@@ -244,7 +300,7 @@ func TestStoreDNSInteraction(t *testing.T) {
 	}
 }
 
-func TestStoreWithAttributes(t *testing.T) {
+func TestSaveAttributes(t *testing.T) {
 	database := setupTestDB(t)
 	p := New(database)
 	_ = p.Init(plugins.InitContext{Logger: zap.NewNop()})
@@ -271,27 +327,32 @@ func TestStoreWithAttributes(t *testing.T) {
 			Headers: map[string][]string{},
 			Body:    nil,
 		},
-		Attributes: map[string]any{
-			"plugin_data":  "test-value",
-			"numeric_data": 42,
-		},
 	}
 
-	id, err := p.Store(context.Background(), draft)
+	id, err := p.CreateInteraction(context.Background(), draft)
 	if err != nil {
-		t.Fatalf("Store failed: %v", err)
+		t.Fatalf("CreateInteraction failed: %v", err)
 	}
 
-	attrs, err := db.GetAttributes(database, id)
+	attrs := map[string]any{
+		"plugin_data":  "test-value",
+		"numeric_data": 42,
+	}
+	err = p.SaveAttributes(context.Background(), id, attrs)
+	if err != nil {
+		t.Fatalf("SaveAttributes failed: %v", err)
+	}
+
+	savedAttrs, err := db.GetAttributes(database, id)
 	if err != nil {
 		t.Fatalf("GetAttributes failed: %v", err)
 	}
 
-	if attrs["plugin_data"] != "test-value" {
-		t.Errorf("plugin_data = %v, want %q", attrs["plugin_data"], "test-value")
+	if savedAttrs["plugin_data"] != "test-value" {
+		t.Errorf("plugin_data = %v, want %q", savedAttrs["plugin_data"], "test-value")
 	}
-	if v, ok := attrs["numeric_data"].(float64); !ok || v != 42 {
-		t.Errorf("numeric_data = %v, want 42", attrs["numeric_data"])
+	if v, ok := savedAttrs["numeric_data"].(float64); !ok || v != 42 {
+		t.Errorf("numeric_data = %v, want 42", savedAttrs["numeric_data"])
 	}
 }
 
@@ -315,7 +376,7 @@ func TestStoreHTTPWithoutHTTPDraft(t *testing.T) {
 		HTTP:       nil,
 	}
 
-	id, err := p.Store(context.Background(), draft)
+	id, err := p.CreateInteraction(context.Background(), draft)
 	if err != nil {
 		t.Fatalf("Store failed: %v", err)
 	}
@@ -353,7 +414,7 @@ func TestStoreDNSWithoutDNSDraft(t *testing.T) {
 		DNS:        nil,
 	}
 
-	id, err := p.Store(context.Background(), draft)
+	id, err := p.CreateInteraction(context.Background(), draft)
 	if err != nil {
 		t.Fatalf("Store failed: %v", err)
 	}
